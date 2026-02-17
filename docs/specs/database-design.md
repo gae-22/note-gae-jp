@@ -1,205 +1,206 @@
-# データベース設計書
+# データベース設計書 (Database Design Specification)
+
+本ドキュメントは、`note-gae-jp` プロジェクトにおけるデータベース設計を**厳密に**定義する。
+開発者は本仕様書に完全に準拠し、勝手な解釈による実装を行ってはならない。
 
 ## 1. データベース概要
 
 ### 1.1 基本情報
 
-| 項目                 | 値                        |
-| -------------------- | ------------------------- |
-| DBMS                 | SQLite 3.x                |
-| ORM                  | Drizzle ORM               |
-| ファイル名           | `data.db`                 |
-| 配置場所             | `data/data.db`            |
-| 文字エンコーディング | UTF-8                     |
-| Journal Mode         | WAL (Write-Ahead Logging) |
-| Foreign Keys         | PRAGMA foreign_keys = ON  |
+| 項目             | 値                        | 備考                                           |
+| :--------------- | :------------------------ | :--------------------------------------------- |
+| **DBMS**         | SQLite 3.x                | `better-sqlite3` ドライバー使用                |
+| **ORM**          | Drizzle ORM               | スキーマ駆動開発                               |
+| **ファイルパス** | `data/data.db`            | 本番環境では永続化ボリュームに配置             |
+| **文字コード**   | UTF-8                     |                                                |
+| **Journal Mode** | WAL (Write-Ahead Logging) | 並行性向上のため必須                           |
+| **Foreign Keys** | ON                        | `PRAGMA foreign_keys = ON;` を接続時に必ず実行 |
 
-### 1.2 設計方針
+### 1.2 設計方針 (Strict Policies)
 
-- **正規化:** 第3正規形を基本とする
-- **命名規則:** スネークケース（`user_id`, `created_at`）
-- **主キー:** ULID または UUID を使用（自動採番は使用しない）
-- **タイムスタンプ:** Unix Timestamp (秒) で保存、UTCベース
-- **NULL許容:** 明示的な必要性がない限りNOT NULLとする
-- **インデックス:** 検索・JOIN対象カラムには適切にインデックスを設定
+1.  **ID生成:** 全ての主キーはアプリケーション側で **ULID** を生成して格納する。DB側の `AUTOINCREMENT` は使用しない。
+2.  **時刻扱い:**
+    - カラム型: `integer` (Unix Timestamp, 秒精度)
+    - Drizzle定義: `mode: 'timestamp'` (JavaScript `Date` オブジェクトとして扱う)
+    - 保存値: UTC とする。
+3.  **NULL制約:** `nullable` と明記されたカラム以外は全て `NOT NULL` とする。
+4.  **物理削除:** データは原則として**物理削除**する（論理削除フラグ `is_deleted` は使用しない）。
+5.  **インデックス:** クエリパターンに基づき、必要な箇所にのみインデックスを貼る。過剰なインデックスは避ける。
 
 ---
 
-## 2. テーブル定義
+## 2. テーブル定義 (Schema Definitions)
 
 ### 2.1 users テーブル
 
-管理者アカウント情報を格納する。本システムは単一ユーザー前提のため、通常1レコードのみ存在する。
-
-#### スキーマ定義
+管理者アカウント情報を格納する。シングルテナントであっても拡張性を考慮しテーブル化する。
 
 ```typescript
+// packages/backend/src/db/schema.ts
+
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const users = sqliteTable('users', {
+    /**
+     * ユーザーID (ULID)
+     * 例: 01ARZ3NDEKTSV4RRFFQ69G5FAV
+     */
     id: text('id').primaryKey(),
+
+    /**
+     * ログインID
+     * 英数字および一部記号のみ許容。
+     */
     username: text('username').notNull().unique(),
+
+    /**
+     * パスワードハッシュ
+     * アルゴリズム: Argon2id (v13)
+     * 設定: memory=64MB, time=3, parallelism=4 (推奨)
+     * 平文保存は厳禁。
+     */
     passwordHash: text('password_hash').notNull(),
+
+    /**
+     * 作成日時
+     */
     createdAt: integer('created_at', { mode: 'timestamp' })
         .notNull()
         .default(sql`(unixepoch())`),
 });
 ```
-
-#### カラム詳細
-
-| カラム名      | 型      | NULL | デフォルト値 | 説明                                 |
-| ------------- | ------- | ---- | ------------ | ------------------------------------ |
-| id            | TEXT    | ×    | -            | ユーザーID（ULID）                   |
-| username      | TEXT    | ×    | -            | ログインID（ユニーク）               |
-| password_hash | TEXT    | ×    | -            | bcrypt ハッシュ化されたパスワード    |
-| created_at    | INTEGER | ×    | unixepoch()  | アカウント作成日時（Unix Timestamp） |
-
-#### インデックス
-
-```sql
-CREATE UNIQUE INDEX idx_users_username ON users(username);
-```
-
-#### 制約
-
-- `username` は UNIQUE
-- `password_hash` は bcrypt または argon2 でハッシュ化されたもの（60文字以上推奨）
-
-#### サンプルデータ
-
-```typescript
-// Seed script example
-import { ulid } from 'ulid';
-import bcrypt from 'bcryptjs';
-
-const adminUser = {
-    id: ulid(),
-    username: 'admin',
-    passwordHash: await bcrypt.hash('SecurePassword123!', 10),
-    createdAt: new Date(),
-};
-```
-
----
 
 ### 2.2 notes テーブル
 
-メモ本体および公開設定を管理する。
-
-#### スキーマ定義
+メモの本体および設定を管理する。
 
 ```typescript
-export const notes = sqliteTable('notes', {
-    id: text('id').primaryKey(),
+import {
+    sqliteTable,
+    text,
+    integer,
+    index,
+    uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
 
-    title: text('title').notNull(),
-    content: text('content').notNull(),
+export const notes = sqliteTable(
+    'notes',
+    {
+        id: text('id').primaryKey(),
 
-    // Visibility settings
-    visibility: text('visibility', {
-        enum: ['private', 'public', 'shared'],
-    })
-        .notNull()
-        .default('private'),
+        title: text('title').notNull(),
 
-    // Link sharing
-    shareToken: text('share_token').unique(),
-    shareExpiresAt: integer('share_expires_at', { mode: 'timestamp' }),
+        /**
+         * 本文 (Markdown)
+         * - 空文字許容
+         * - 最大長: SQLite限界まで（実質無制限）
+         */
+        content: text('content').notNull().default(''),
 
-    // Metadata
-    createdAt: integer('created_at', { mode: 'timestamp' })
-        .notNull()
-        .default(sql`(unixepoch())`),
-    updatedAt: integer('updated_at', { mode: 'timestamp' })
-        .notNull()
-        .default(sql`(unixepoch())`),
-});
+        /**
+         * カバー画像 URL
+         * - 内部パス (/uploads/...) または 外部URL
+         */
+        coverImage: text('cover_image'),
+
+        /**
+         * アイコン
+         * - Emoji 1文字 または 画像URL
+         */
+        icon: text('icon'),
+
+        /**
+         * 公開設定
+         * - private: 自分のみ
+         * - public: インターネット公開
+         * - shared: リンクを知っている人のみ
+         */
+        visibility: text('visibility', {
+            enum: ['private', 'public', 'shared'],
+        })
+            .notNull()
+            .default('private'),
+
+        /**
+         * 共有トークン (UUID v4)
+         * - visibility = 'shared' の場合のみ有効
+         * - 推測不可能なランダム文字列
+         */
+        shareToken: text('share_token'),
+
+        /**
+         * 共有リンク有効期限
+         * - この時刻「未満」であればアクセス可能 (current < expiresAt)
+         * - NULLの場合は無期限
+         */
+        shareExpiresAt: integer('share_expires_at', { mode: 'timestamp' }),
+
+        createdAt: integer('created_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+
+        updatedAt: integer('updated_at', { mode: 'timestamp' })
+            .notNull()
+            .default(sql`(unixepoch())`),
+    },
+    (table) => ({
+        // 公開範囲でのフィルタリング用
+        visibilityIdx: index('idx_notes_visibility').on(table.visibility),
+        // 更新順ソート用
+        updatedAtIdx: index('idx_notes_updated_at').on(table.updatedAt),
+        // 共有トークン検索用 (高速化必須)
+        shareTokenIdx: uniqueIndex('idx_notes_share_token').on(
+            table.shareToken,
+        ),
+    }),
+);
 ```
-
-#### カラム詳細
-
-| カラム名         | 型      | NULL | デフォルト値 | 説明                                                    |
-| ---------------- | ------- | ---- | ------------ | ------------------------------------------------------- |
-| id               | TEXT    | ×    | -            | メモID（ULID）                                          |
-| title            | TEXT    | ×    | -            | メモのタイトル                                          |
-| content          | TEXT    | ×    | -            | Markdown形式の本文                                      |
-| visibility       | TEXT    | ×    | 'private'    | 公開範囲（'private', 'public', 'shared'）               |
-| share_token      | TEXT    | ○    | NULL         | 共有用トークン（UUIDv4、visibility='shared'時のみ設定） |
-| share_expires_at | INTEGER | ○    | NULL         | 共有リンク有効期限（Unix Timestamp、NULL=無期限）       |
-| created_at       | INTEGER | ×    | unixepoch()  | 作成日時                                                |
-| updated_at       | INTEGER | ×    | unixepoch()  | 最終更新日時                                            |
-
-#### インデックス
-
-```sql
--- 公開メモの高速取得
-CREATE INDEX idx_notes_visibility ON notes(visibility);
-
--- 更新日時でのソート用
-CREATE INDEX idx_notes_updated_at ON notes(updated_at DESC);
-
--- 共有トークン検索用（UNIQUE）
-CREATE UNIQUE INDEX idx_notes_share_token ON notes(share_token) WHERE share_token IS NOT NULL;
-
--- 期限切れ共有リンクのクリーンアップ用
-CREATE INDEX idx_notes_share_expires_at ON notes(share_expires_at) WHERE share_expires_at IS NOT NULL;
-```
-
-#### 制約
-
-- `visibility` は `'private'`, `'public'`, `'shared'` のいずれか
-- `share_token` は `visibility = 'shared'` の場合のみ設定
-- `share_token` は UUID v4 形式（36文字）
-- `share_expires_at` は未来の日時、または NULL（無期限）
-
-#### ビジネスロジック制約
-
-```typescript
-// Service Layer で実装すべきルール
-const validateNoteVisibility = (note: Note) => {
-    if (note.visibility === 'shared') {
-        // sharedの場合、share_tokenは必須
-        if (!note.shareToken) {
-            throw new Error('share_token is required for shared notes');
-        }
-    } else {
-        // private/publicの場合、share_tokenは不要
-        if (note.shareToken) {
-            throw new Error(
-                'share_token should not be set for non-shared notes',
-            );
-        }
-    }
-
-    // 期限切れチェック
-    if (note.shareExpiresAt && note.shareExpiresAt < new Date()) {
-        throw new Error('Share link has expired');
-    }
-};
-```
-
----
 
 ### 2.3 files テーブル
 
-アップロードされたファイルのメタデータを管理する。物理ファイルは `uploads/` ディレクトリに保存。
-
-#### スキーマ定義
+アップロードされたファイルのメタデータを管理する。
+**注意**: レコード削除時の物理ファイル削除方針については、「4. データ整合性・削除方針」を参照。
 
 ```typescript
 export const files = sqliteTable('files', {
     id: text('id').primaryKey(),
 
+    /**
+     * サーバー保存ファイル名
+     * 形式: `<ULID>.<ext>` (例: 01H... .png)
+     * これによりファイル名の衝突を完全に回避する。
+     */
     filename: text('filename').notNull(),
+
+    /**
+     * アップロード時の元ファイル名
+     * 表示・ダウンロード用。
+     */
     originalFilename: text('original_filename').notNull(),
+
+    /**
+     * 保存パス (相対パス)
+     * 形式: `uploads/YYYY/MM/<filename>`
+     * 一意制約あり。
+     */
     path: text('path').notNull().unique(),
 
+    /**
+     * MIMEタイプ (image/png, application/pdf 等)
+     */
     mimeType: text('mime_type').notNull(),
+
+    /**
+     * ファイルサイズ (bytes)
+     */
     size: integer('size').notNull(),
 
-    // Optional: Note association
+    /**
+     * 関連メモID
+     * - NULL可 (未割り当てファイル用)
+     * - ON DELETE SET NULL (メモが消えてもファイルメタデータは残す)
+     */
     noteId: text('note_id').references(() => notes.id, {
         onDelete: 'set null',
     }),
@@ -210,75 +211,32 @@ export const files = sqliteTable('files', {
 });
 ```
 
-#### カラム詳細
+### 2.4 sessions テーブル
 
-| カラム名          | 型      | NULL | デフォルト値 | 説明                                                   |
-| ----------------- | ------- | ---- | ------------ | ------------------------------------------------------ |
-| id                | TEXT    | ×    | -            | ファイルID（ULID）                                     |
-| filename          | TEXT    | ×    | -            | サーバー保存時のファイル名（一意、安全な名前）         |
-| original_filename | TEXT    | ×    | -            | ユーザーがアップロードした元のファイル名               |
-| path              | TEXT    | ×    | -            | サーバー上の相対パス（例: `uploads/2026/02/ulid.png`） |
-| mime_type         | TEXT    | ×    | -            | MIMEタイプ（例: `image/png`, `application/pdf`）       |
-| size              | INTEGER | ×    | -            | ファイルサイズ（バイト）                               |
-| note_id           | TEXT    | ○    | NULL         | 関連するメモID（外部キー、削除時はNULL）               |
-| uploaded_at       | INTEGER | ×    | unixepoch()  | アップロード日時                                       |
-
-#### インデックス
-
-```sql
--- パスでの一意性保証
-CREATE UNIQUE INDEX idx_files_path ON files(path);
-
--- メモに紐づくファイル検索用
-CREATE INDEX idx_files_note_id ON files(note_id) WHERE note_id IS NOT NULL;
-
--- アップロード日時でのソート用
-CREATE INDEX idx_files_uploaded_at ON files(uploaded_at DESC);
-```
-
-#### 制約
-
-- `path` は UNIQUE（物理ファイルとの1対1対応）
-- `size` は正の整数（0バイトファイルは拒否）
-- `mime_type` は許可されたMIMEタイプのみ（バリデーションはアプリケーション層）
-
-#### ファイル命名規則
-
-```typescript
-// Service Layer での実装例
-import { ulid } from 'ulid';
-import path from 'path';
-
-const generateFilePath = (originalFilename: string): string => {
-    const ext = path.extname(originalFilename);
-    const id = ulid();
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
-
-    return `uploads/${year}/${month}/${id}${ext}`;
-};
-
-// Example: uploads/2026/02/01HQXZ9Y8K7J6M5N4P3Q2R1S0T.png
-```
-
----
-
-### 2.4 sessions テーブル（オプション）
-
-セッション情報を管理する。Hono Session Middleware が自動生成する可能性があるが、明示的に定義する場合。
-
-#### スキーマ定義
+認証セッション管理用。
 
 ```typescript
 export const sessions = sqliteTable('sessions', {
     id: text('id').primaryKey(),
 
+    /**
+     * ユーザーID
+     * ON DELETE CASCADE (ユーザー削除でセッションも消える)
+     */
     userId: text('user_id')
         .notNull()
         .references(() => users.id, { onDelete: 'cascade' }),
 
+    /**
+     * セッショントークン
+     * - UUID v4 または 32byte以上のランダム文字列(Hex)
+     */
     token: text('token').notNull().unique(),
 
+    /**
+     * 有効期限
+     * - 作成から7日間 (固定)
+     */
     expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
 
     createdAt: integer('created_at', { mode: 'timestamp' })
@@ -287,583 +245,108 @@ export const sessions = sqliteTable('sessions', {
 });
 ```
 
-#### カラム詳細
+---
 
-| カラム名   | 型      | NULL | デフォルト値 | 説明                               |
-| ---------- | ------- | ---- | ------------ | ---------------------------------- |
-| id         | TEXT    | ×    | -            | セッションID（ULID）               |
-| user_id    | TEXT    | ×    | -            | ユーザーID（外部キー）             |
-| token      | TEXT    | ×    | -            | セッショントークン（ランダム生成） |
-| expires_at | INTEGER | ×    | -            | 有効期限（Unix Timestamp）         |
-| created_at | INTEGER | ×    | unixepoch()  | 作成日時                           |
+## 3. リレーション定義 (Relations)
 
-#### インデックス
+Drizzle ORM レベルでのリレーション定義。
 
-```sql
-CREATE UNIQUE INDEX idx_sessions_token ON sessions(token);
-CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
+```typescript
+import { relations } from 'drizzle-orm';
+
+export const usersRelations = relations(users, ({ many }) => ({
+    sessions: many(sessions),
+}));
+
+export const notesRelations = relations(notes, ({ many }) => ({
+    files: many(files),
+}));
+
+export const filesRelations = relations(files, ({ one }) => ({
+    note: one(notes, {
+        fields: [files.noteId],
+        references: [notes.id],
+    }),
+}));
+
+export const sessionsRelations = relations(sessions, ({ one }) => ({
+    user: one(users, {
+        fields: [sessions.userId],
+        references: [users.id],
+    }),
+}));
 ```
 
 ---
 
-## 3. リレーションシップ
+## 4. データ整合性・削除方針
 
-```mermaid
-erDiagram
-    users ||--o{ sessions : "has many"
-    notes ||--o{ files : "has many"
+ファイルの整合性を保つため、以下のルールを厳守する。
 
-    users {
-        text id PK
-        text username UK
-        text password_hash
-        integer created_at
-    }
+### 4.1 メモ削除時の挙動
 
-    notes {
-        text id PK
-        text title
-        text content
-        text visibility
-        text share_token UK
-        integer share_expires_at
-        integer created_at
-        integer updated_at
-    }
-
-    files {
-        text id PK
-        text filename
-        text original_filename
-        text path UK
-        text mime_type
-        integer size
-        text note_id FK
-        integer uploaded_at
-    }
-
-    sessions {
-        text id PK
-        text user_id FK
-        text token UK
-        integer expires_at
-        integer created_at
-    }
-```
+1.  **DBレコード:** `notes` テーブルから物理削除 (`DELETE FROM notes WHERE id = ?`)。
+2.  **関連ファイル (Files):** `files.noteId` は外部キー制約 `ON DELETE SET NULL` により `NULL` に更新される。
+    - **理由:** 誤ってメモを削除した場合でも、アップロードした画像等のアセットが即座に消えないようにするため（安全策）。
+3.  **ファイル実体:** 上記の通り、レコードが残るため**削除しない**。
+4.  **孤立ファイルの掃除:**
+    - 別途、管理画面から「孤立ファイル（`noteId IS NULL`）の一覧・一括削除」を行う機能を提供する。
+    - あるいは、バッチ処理で `uploadedAt` が一定期間以上前の孤立ファイルを削除する。
 
 ---
 
-## 4. 全文検索 (FTS5)
+## 5. マイグレーション運用 (Migration Workflow)
 
-SQLite の FTS5 (Full-Text Search 5) を使用し、メモのタイトルと本文を高速検索する。
+Drizzle Kit を使用したスキーマ管理フロー。
 
-### 4.1 FTS5 仮想テーブル定義
+1.  **スキーマ変更:** `src/db/schema.ts` を編集。
+2.  **マイグレーション生成:**
+    ```bash
+    pnpm drizzle-kit generate
+    ```
+    `drizzle/migrations/` 配下にSQLファイルが生成される。
+3.  **マイグレーション適用:**
+    アプリ起動時に自動適用、あるいは手動コマンドで適用。
+    ```bash
+    pnpm drizzle-kit migrate
+    ```
+
+---
+
+## 6. Full-Text Search (FTS5)
+
+SQLite FTS5 を利用した検索機能の実装方針。
 
 ```sql
+-- マイグレーションSQL (手動追加)
 CREATE VIRTUAL TABLE notes_fts USING fts5(
   id UNINDEXED,
   title,
   content,
-  content=notes,
-  content_rowid=id
+  content='notes',
+  content_rowid='id',
+  tokenize='trigram' -- 日本語検索のためにtrigram推奨
 );
-```
 
-**説明:**
-
-- `id UNINDEXED`: 検索対象外（JOIN用）
-- `title`, `content`: 検索対象カラム
-- `content=notes`: ベーステーブルは `notes`
-- `content_rowid=id`: 主キーは `id`（TEXTだがFTS5は対応）
-
-### 4.2 FTS5 トリガー設定
-
-```sql
--- INSERT時: FTS5にデータを追加
-CREATE TRIGGER notes_fts_insert AFTER INSERT ON notes
-BEGIN
-  INSERT INTO notes_fts(id, title, content)
-  VALUES (new.id, new.title, new.content);
+-- トリガー (Notesテーブルとの同期)
+CREATE TRIGGER notes_ai AFTER INSERT ON notes BEGIN
+  INSERT INTO notes_fts(id, title, content) VALUES (new.id, new.title, new.content);
 END;
-
--- UPDATE時: FTS5のデータを更新
-CREATE TRIGGER notes_fts_update AFTER UPDATE ON notes
-BEGIN
-  UPDATE notes_fts
-  SET title = new.title, content = new.content
-  WHERE id = old.id;
+CREATE TRIGGER notes_ad AFTER DELETE ON notes BEGIN
+  INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
 END;
-
--- DELETE時: FTS5からデータを削除
-CREATE TRIGGER notes_fts_delete AFTER DELETE ON notes
-BEGIN
-  DELETE FROM notes_fts WHERE id = old.id;
+CREATE TRIGGER notes_au AFTER UPDATE ON notes BEGIN
+  INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
+  INSERT INTO notes_fts(id, title, content) VALUES (new.id, new.title, new.content);
 END;
 ```
 
-### 4.3 検索クエリ例
+**実装メモ:**
 
-```typescript
-// Drizzle ORM での FTS5 検索（生SQL使用）
-import { db } from './client';
-
-const searchNotes = async (query: string, visibility?: string) => {
-    const visibilityFilter = visibility
-        ? `AND n.visibility = '${visibility}'`
-        : '';
-
-    const results = await db.all(
-        sql`
-    SELECT
-      n.id,
-      n.title,
-      n.content,
-      n.visibility,
-      n.created_at,
-      n.updated_at,
-      snippet(notes_fts, 1, '<mark>', '</mark>', '...', 32) as title_snippet,
-      snippet(notes_fts, 2, '<mark>', '</mark>', '...', 64) as content_snippet,
-      rank
-    FROM notes_fts
-    INNER JOIN notes n ON notes_fts.id = n.id
-    WHERE notes_fts MATCH ?
-    ${visibilityFilter}
-    ORDER BY rank
-    LIMIT 50
-  `,
-        [query],
+- Drizzle ORM は FTS5 をネイティブサポートしていないため、検索時は `sql` タグを用いた Raw Query を使用する。
+- 検索クエリ例:
+    ```typescript
+    const result = await db.all(
+        sql`SELECT * FROM notes_fts WHERE notes_fts MATCH ${query} ORDER BY rank`,
     );
-
-    return results;
-};
-```
-
-**クエリ構文:**
-
-- `MATCH ?`: FTS5検索クエリ
-- `snippet(...)`: 検索結果のハイライト表示用スニペット生成
-- `rank`: 関連度スコア（低いほど関連性が高い）
-
----
-
-## 5. マイグレーション戦略
-
-### 5.1 Drizzle Kit 設定
-
-```typescript
-// drizzle.config.ts
-import type { Config } from 'drizzle-kit';
-
-export default {
-    schema: './src/db/schema.ts',
-    out: './src/db/migrations',
-    driver: 'better-sqlite3',
-    dbCredentials: {
-        url: './data/data.db',
-    },
-    verbose: true,
-    strict: true,
-} satisfies Config;
-```
-
-### 5.2 マイグレーション実行コマンド
-
-```bash
-# スキーマ変更を検出してマイグレーションファイル生成
-pnpm drizzle-kit generate:sqlite
-
-# マイグレーション適用
-pnpm drizzle-kit migrate
-
-# Drizzle Studio でデータ確認
-pnpm drizzle-kit studio
-```
-
-### 5.3 初期マイグレーション（0000_initial.sql）
-
-```sql
--- users table
-CREATE TABLE users (
-  id TEXT PRIMARY KEY,
-  username TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch())
-);
-
-CREATE UNIQUE INDEX idx_users_username ON users(username);
-
--- notes table
-CREATE TABLE notes (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  content TEXT NOT NULL,
-  visibility TEXT NOT NULL DEFAULT 'private',
-  share_token TEXT UNIQUE,
-  share_expires_at INTEGER,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  updated_at INTEGER NOT NULL DEFAULT (unixepoch())
-);
-
-CREATE INDEX idx_notes_visibility ON notes(visibility);
-CREATE INDEX idx_notes_updated_at ON notes(updated_at DESC);
-CREATE UNIQUE INDEX idx_notes_share_token ON notes(share_token) WHERE share_token IS NOT NULL;
-CREATE INDEX idx_notes_share_expires_at ON notes(share_expires_at) WHERE share_expires_at IS NOT NULL;
-
--- files table
-CREATE TABLE files (
-  id TEXT PRIMARY KEY,
-  filename TEXT NOT NULL,
-  original_filename TEXT NOT NULL,
-  path TEXT NOT NULL UNIQUE,
-  mime_type TEXT NOT NULL,
-  size INTEGER NOT NULL,
-  note_id TEXT,
-  uploaded_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE SET NULL
-);
-
-CREATE UNIQUE INDEX idx_files_path ON files(path);
-CREATE INDEX idx_files_note_id ON files(note_id) WHERE note_id IS NOT NULL;
-CREATE INDEX idx_files_uploaded_at ON files(uploaded_at DESC);
-
--- sessions table
-CREATE TABLE sessions (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  token TEXT NOT NULL UNIQUE,
-  expires_at INTEGER NOT NULL,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE UNIQUE INDEX idx_sessions_token ON sessions(token);
-CREATE INDEX idx_sessions_user_id ON sessions(user_id);
-CREATE INDEX idx_sessions_expires_at ON sessions(expires_at);
-
--- FTS5 virtual table
-CREATE VIRTUAL TABLE notes_fts USING fts5(
-  id UNINDEXED,
-  title,
-  content
-);
-
--- FTS5 triggers
-CREATE TRIGGER notes_fts_insert AFTER INSERT ON notes
-BEGIN
-  INSERT INTO notes_fts(id, title, content)
-  VALUES (new.id, new.title, new.content);
-END;
-
-CREATE TRIGGER notes_fts_update AFTER UPDATE ON notes
-BEGIN
-  UPDATE notes_fts
-  SET title = new.title, content = new.content
-  WHERE rowid = (SELECT rowid FROM notes_fts WHERE id = old.id);
-END;
-
-CREATE TRIGGER notes_fts_delete AFTER DELETE ON notes
-BEGIN
-  DELETE FROM notes_fts WHERE id = old.id;
-END;
-
--- Pragma settings
-PRAGMA foreign_keys = ON;
-PRAGMA journal_mode = WAL;
-```
-
----
-
-## 6. シードデータ
-
-### 6.1 admin ユーザー作成
-
-```typescript
-// packages/backend/src/db/seed.ts
-import { db } from './client';
-import { users } from './schema';
-import { ulid } from 'ulid';
-import bcrypt from 'bcryptjs';
-
-export const seedAdminUser = async () => {
-    const existingUser = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, 'admin'))
-        .get();
-
-    if (existingUser) {
-        console.log('Admin user already exists');
-        return;
-    }
-
-    const passwordHash = await bcrypt.hash('ChangeMe123!', 10);
-
-    await db.insert(users).values({
-        id: ulid(),
-        username: 'admin',
-        passwordHash,
-        createdAt: new Date(),
-    });
-
-    console.log('Admin user created: admin / ChangeMe123!');
-};
-```
-
-### 6.2 サンプルノート作成（開発用）
-
-```typescript
-import { notes } from './schema';
-
-export const seedSampleNotes = async () => {
-    const sampleNotes = [
-        {
-            id: ulid(),
-            title: 'Welcome to Markdown Notes',
-            content: '# Hello World\n\nThis is your first note!',
-            visibility: 'public' as const,
-            shareToken: null,
-            shareExpiresAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        },
-        {
-            id: ulid(),
-            title: 'Private Note Example',
-            content: '# Secret Content\n\nThis is private.',
-            visibility: 'private' as const,
-            shareToken: null,
-            shareExpiresAt: null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-        },
-    ];
-
-    await db.insert(notes).values(sampleNotes);
-    console.log('Sample notes created');
-};
-```
-
----
-
-## 7. データベース運用
-
-### 7.1 バックアップ戦略
-
-```bash
-# SQLiteデータベースのバックアップ
-sqlite3 data/data.db ".backup data/data.backup.db"
-
-# または、ファイルコピー（WALモードの場合は注意）
-cp data/data.db data/data.backup.db
-```
-
-### 7.2 WALモードのチェックポイント
-
-```sql
--- WALファイルをメインDBに統合
-PRAGMA wal_checkpoint(TRUNCATE);
-```
-
-### 7.3 データベース最適化
-
-```sql
--- VACUUM: 断片化解消、ファイルサイズ縮小
-VACUUM;
-
--- ANALYZE: クエリプランナー用の統計情報更新
-ANALYZE;
-```
-
-### 7.4 定期メンテナンススクリプト
-
-```typescript
-// packages/backend/src/db/maintenance.ts
-export const runMaintenance = async () => {
-    // 期限切れ共有リンクのクリーンアップ
-    await db
-        .update(notes)
-        .set({
-            visibility: 'private',
-            shareToken: null,
-            shareExpiresAt: null,
-        })
-        .where(
-            and(
-                eq(notes.visibility, 'shared'),
-                lt(notes.shareExpiresAt, new Date()),
-            ),
-        );
-
-    // 期限切れセッションの削除
-    await db.delete(sessions).where(lt(sessions.expiresAt, new Date()));
-
-    // データベース最適化
-    await db.run(sql`VACUUM`);
-    await db.run(sql`ANALYZE`);
-
-    console.log('Database maintenance completed');
-};
-```
-
----
-
-## 8. データベースアクセスパターン
-
-### 8.1 よく使うクエリ
-
-#### ユーザー認証
-
-```typescript
-import { eq } from 'drizzle-orm';
-import { users } from './schema';
-
-// ユーザー名でユーザー取得
-const getUserByUsername = async (username: string) => {
-    return await db
-        .select()
-        .from(users)
-        .where(eq(users.username, username))
-        .get();
-};
-```
-
-#### メモ一覧取得（権限別）
-
-```typescript
-import { desc, eq, or, and } from 'drizzle-orm';
-import { notes } from './schema';
-
-// 管理者: 全メモ取得
-const getAllNotes = async () => {
-    return await db.select().from(notes).orderBy(desc(notes.updatedAt)).all();
-};
-
-// ゲスト: 公開メモのみ取得
-const getPublicNotes = async () => {
-    return await db
-        .select()
-        .from(notes)
-        .where(eq(notes.visibility, 'public'))
-        .orderBy(desc(notes.updatedAt))
-        .all();
-};
-```
-
-#### 共有リンク検証
-
-```typescript
-// 共有トークンでメモ取得（期限チェック含む）
-const getNoteByShareToken = async (token: string) => {
-    const note = await db
-        .select()
-        .from(notes)
-        .where(
-            and(
-                eq(notes.shareToken, token),
-                eq(notes.visibility, 'shared'),
-                or(
-                    isNull(notes.shareExpiresAt),
-                    gt(notes.shareExpiresAt, new Date()),
-                ),
-            ),
-        )
-        .get();
-
-    return note;
-};
-```
-
-### 8.2 トランザクション例
-
-```typescript
-// メモ削除時、関連ファイルも削除
-const deleteNoteWithFiles = async (noteId: string) => {
-    await db.transaction(async (tx) => {
-        // 関連ファイル取得
-        const relatedFiles = await tx
-            .select()
-            .from(files)
-            .where(eq(files.noteId, noteId))
-            .all();
-
-        // 物理ファイル削除（ファイルシステム）
-        for (const file of relatedFiles) {
-            await fs.unlink(file.path);
-        }
-
-        // DBからファイル削除
-        await tx.delete(files).where(eq(files.noteId, noteId));
-
-        // メモ削除
-        await tx.delete(notes).where(eq(notes.id, noteId));
-    });
-};
-```
-
----
-
-## 9. パフォーマンスチューニング
-
-### 9.1 推奨 PRAGMA 設定
-
-```sql
-PRAGMA journal_mode = WAL;           -- Write-Ahead Logging
-PRAGMA synchronous = NORMAL;         -- バランス型同期モード
-PRAGMA foreign_keys = ON;            -- 外部キー制約有効化
-PRAGMA temp_store = MEMORY;          -- 一時テーブルをメモリに保存
-PRAGMA cache_size = -64000;          -- キャッシュサイズ64MB
-PRAGMA mmap_size = 268435456;        -- メモリマップ256MB
-```
-
-### 9.2 インデックス活用確認
-
-```sql
--- クエリプランの確認
-EXPLAIN QUERY PLAN
-SELECT * FROM notes WHERE visibility = 'public' ORDER BY updated_at DESC;
-
--- インデックスが使われているか確認
--- 期待される結果: SEARCH notes USING INDEX idx_notes_visibility
-```
-
----
-
-## 10. セキュリティ考慮事項
-
-### 10.1 SQLインジェクション対策
-
-- **Drizzle ORM のプレースホルダーを使用**（自動でエスケープ）
-- **生SQLは極力避ける**。使用する場合は `sql` タグ関数とパラメータバインディング
-
-```typescript
-// ✅ Good
-const result = await db.select().from(notes).where(eq(notes.id, userId));
-
-// ❌ Bad
-const result = await db.run(
-    sql.raw(`SELECT * FROM notes WHERE id = '${userId}'`),
-);
-```
-
-### 10.2 パスワード保護
-
-- **bcrypt または argon2** でハッシュ化
-- **ソルトラウンド: 10以上**（bcrypt）
-- **絶対に平文保存しない**
-
-### 10.3 セッション管理
-
-- **HttpOnly Cookie** 使用（XSS対策）
-- **SameSite=Lax** または **Strict** 設定（CSRF対策）
-- **有効期限: 7日間** 推奨
-- **期限切れセッションは定期削除**
-
----
-
-## 11. 参考資料
-
-- [SQLite Documentation](https://www.sqlite.org/docs.html)
-- [Drizzle ORM Documentation](https://orm.drizzle.team/)
-- [SQLite FTS5 Extension](https://www.sqlite.org/fts5.html)
-- [ULID Specification](https://github.com/ulid/spec)
+    ```

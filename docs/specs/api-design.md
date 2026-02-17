@@ -1,1310 +1,299 @@
-# API設計書
+# API設計書 (API Design Specification)
 
-## 1. API概要
-
-### 1.1 基本情報
-
-| 項目           | 値                                      |
-| -------------- | --------------------------------------- |
-| Base URL       | `/api`                                  |
-| Protocol       | HTTP/HTTPS                              |
-| Data Format    | JSON                                    |
-| Authentication | Session-based (HttpOnly Cookie)         |
-| CORS           | Same-Origin (本番環境), Localhost (Dev) |
-| API Style      | Hono RPC (Type-safe)                    |
-
-### 1.2 設計方針
-
-- **型安全性:** Hono RPC により、フロントエンドとバックエンドで型を共有
-- **バリデーション:** 全てのリクエストをZodスキーマで検証
-- **エラーハンドリング:** 統一されたエラーレスポンス形式
-- **CSRF対策:** POSTリクエストにはCSRFトークン必須
-- **認可:** ミドルウェアによる権限チェック
+本ドキュメントは、`note-gae-jp` の API 仕様およびバックエンドのビジネスロジックを**厳密に**定義する。
+Hono (RPC Mode) を採用し、フロントエンド・バックエンド間で型安全な通信を実現する。
 
 ---
 
-## 2. 共通仕様
+## 1. API 共通仕様
 
-### 2.1 エラーレスポンス形式
+### 1.1 基本方針
 
-全てのエラーレスポンスは以下の形式で返却される。
+- **Framework:** Hono (v4.x)
+- **Protocol:** HTTP/1.1 or HTTP/2
+- **Data Format:** JSON (Content-Type: application/json)
+    - ※ ファイルアップロードのみ `multipart/form-data`
+- **Authentication:** HttpOnly Cookie (`session_id`)
+    - SameSite: Lax
+    - Secure: True (Production), False (Development)
+    - Path: /
+- **Error Handling:** 統一されたエラーレスポンス形式を使用
+- **Validation:** Zod による厳格なバリデーション (Request/Response)
 
-```typescript
-type ErrorResponse = {
-    success: false;
-    error: {
-        code: string;
-        message: string;
-        details?: unknown;
-    };
-};
+### 1.2 レスポンスフォーマット
+
+全ての API レスポンスは、成功時と失敗時で以下の形式に統一する。
+
+#### 成功時 (Success Response)
+
+```json
+{
+  "success": true,
+  "data": { ... } // エンドポイント固有のデータ
+}
 ```
 
-#### エラーコード一覧
-
-| HTTP Status | Error Code              | 説明                     |
-| ----------- | ----------------------- | ------------------------ |
-| 400         | `VALIDATION_ERROR`      | リクエストパラメータ不正 |
-| 401         | `UNAUTHORIZED`          | 認証が必要               |
-| 403         | `FORBIDDEN`             | アクセス権限なし         |
-| 404         | `NOT_FOUND`             | リソースが存在しない     |
-| 409         | `CONFLICT`              | リソースの競合（重複等） |
-| 413         | `PAYLOAD_TOO_LARGE`     | ファイルサイズ超過       |
-| 429         | `RATE_LIMIT_EXCEEDED`   | レート制限超過           |
-| 500         | `INTERNAL_SERVER_ERROR` | サーバー内部エラー       |
-
-#### エラーレスポンス例
+#### 失敗時 (Error Response)
 
 ```json
 {
     "success": false,
     "error": {
-        "code": "VALIDATION_ERROR",
-        "message": "Invalid request parameters",
-        "details": {
-            "title": "Title is required",
-            "content": "Content must be at least 1 character"
-        }
+        "code": "BAD_REQUEST", // エラーコード (String)
+        "message": "Invalid input data" // 開発者向けメッセージ (User UI表示用ではない)
     }
 }
 ```
 
-### 2.2 成功レスポンス形式
+### 1.3 エラーコード定義 (Strict Mapping)
 
-```typescript
-type SuccessResponse<T> = {
-    success: true;
-    data: T;
-};
-```
-
-### 2.3 ページネーション
-
-```typescript
-type PaginatedResponse<T> = {
-    success: true;
-    data: T[];
-    pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        totalPages: number;
-    };
-};
-```
+| コード                  | HTTP Status | 説明                                                       |
+| :---------------------- | :---------- | :--------------------------------------------------------- |
+| `BAD_REQUEST`           | 400         | バリデーションエラー、不正なパラメータ                     |
+| `UNAUTHORIZED`          | 401         | 未認証、セッション期限切れ、クッキー不備                   |
+| `FORBIDDEN`             | 403         | 権限不足 (他人のPrivateメモへのアクセス等)                 |
+| `NOT_FOUND`             | 404         | リソースが存在しない、またはアクセス権がなく隠蔽されている |
+| `METHOD_NOT_ALLOWED`    | 405         | 許可されていないHTTPメソッド                               |
+| `CONFLICT`              | 409         | データの整合性エラー (一意制約違反など)                    |
+| `PAYLOAD_TOO_LARGE`     | 413         | アップロードファイルサイズ超過                             |
+| `INTERNAL_SERVER_ERROR` | 500         | 予期せぬサーバーエラー                                     |
 
 ---
 
-## 3. 認証API (`/api/auth`)
+## 2. バリデーションスキーマ (Zod Schemas)
 
-### 3.1 ログイン
+**配置場所:** `packages/backend/src/validators/`
+これらのスキーマは `packages/shared` (または同等の共有領域) からエクスポートされ、フロントエンドでも再利用される。
 
-**Endpoint:** `POST /api/auth/login`
-
-**説明:** 管理者ログイン
-
-**Request Body:**
-
-```typescript
-{
-    username: string; // 3-50文字
-    password: string; // 8-100文字
-}
-```
-
-**Zod Schema:**
+### 2.1 共通スキーマ
 
 ```typescript
 import { z } from 'zod';
 
-export const loginSchema = z.object({
-    username: z.string().min(3).max(50),
-    password: z.string().min(8).max(100),
-});
+// ULID形式
+export const ulidSchema = z
+    .string()
+    .length(26)
+    .regex(/^[0-9A-Z]+$/);
 
-export type LoginInput = z.infer<typeof loginSchema>;
-```
+// UUID形式
+export const uuidSchema = z.string().uuid();
 
-**Response Success (200):**
-
-```typescript
-{
-    success: true;
-    data: {
-        user: {
-            id: string;
-            username: string;
-        }
-    }
-}
-
-// + Set-Cookie: session_token=...; HttpOnly; SameSite=Lax; Max-Age=604800
-```
-
-**Response Error:**
-
-| Status | Code                  | 説明                                     |
-| ------ | --------------------- | ---------------------------------------- |
-| 400    | `VALIDATION_ERROR`    | 入力値不正                               |
-| 401    | `INVALID_CREDENTIALS` | ユーザー名またはパスワードが間違っている |
-| 429    | `RATE_LIMIT_EXCEEDED` | ログイン試行回数超過                     |
-
-**実装例 (Hono):**
-
-```typescript
-// packages/backend/src/routes/auth.ts
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
-import { loginSchema } from '../validators/auth';
-import { loginUser } from '../services/auth/login';
-
-export const authRoutes = new Hono();
-
-authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
-    const { username, password } = c.req.valid('json');
-
-    const result = await loginUser({ username, password });
-
-    if (!result.success) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'INVALID_CREDENTIALS',
-                    message: 'Invalid username or password',
-                },
-            },
-            401,
-        );
-    }
-
-    // セッション作成
-    c.header(
-        'Set-Cookie',
-        `session_token=${result.sessionToken}; HttpOnly; SameSite=Lax; Max-Age=604800; Path=/`,
-    );
-
-    return c.json({
-        success: true,
-        data: {
-            user: result.user,
-        },
-    });
-});
-```
-
----
-
-### 3.2 ログアウト
-
-**Endpoint:** `POST /api/auth/logout`
-
-**説明:** セッション破棄
-
-**Authentication:** Required (Admin)
-
-**Request Body:** なし
-
-**Response Success (200):**
-
-```json
-{
-    "success": true,
-    "data": null
-}
-```
-
-**実装例:**
-
-```typescript
-authRoutes.post('/logout', authMiddleware, async (c) => {
-    const sessionToken = getCookie(c, 'session_token');
-
-    if (sessionToken) {
-        await deleteSession(sessionToken);
-    }
-
-    // Cookie削除
-    c.header(
-        'Set-Cookie',
-        'session_token=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/',
-    );
-
-    return c.json({
-        success: true,
-        data: null,
-    });
-});
-```
-
----
-
-### 3.3 現在のユーザー取得
-
-**Endpoint:** `GET /api/auth/me`
-
-**説明:** ログイン中のユーザー情報取得
-
-**Authentication:** Optional
-
-**Response Success (200):**
-
-```typescript
-{
-  success: true;
-  data: {
-    user: {
-      id: string;
-      username: string;
-    } | null
-  }
-}
-```
-
-**実装例:**
-
-```typescript
-authRoutes.get('/me', async (c) => {
-    const sessionToken = getCookie(c, 'session_token');
-
-    if (!sessionToken) {
-        return c.json({
-            success: true,
-            data: { user: null },
-        });
-    }
-
-    const user = await getUserFromSession(sessionToken);
-
-    return c.json({
-        success: true,
-        data: { user },
-    });
-});
-```
-
----
-
-## 4. メモAPI (`/api/notes`)
-
-### 4.1 メモ一覧取得
-
-**Endpoint:** `GET /api/notes`
-
-**説明:** メモ一覧を取得（権限に応じてフィルタリング）
-
-**Authentication:** Optional
-
-**Query Parameters:**
-
-```typescript
-{
-  q?: string;         // 検索クエリ（FTS5）
-  page?: number;      // ページ番号（デフォルト: 1）
-  limit?: number;     // 1ページあたりの件数（デフォルト: 20, 最大: 100）
-  sort?: 'updated' | 'created' | 'title';  // ソート順（デフォルト: 'updated'）
-}
-```
-
-**Zod Schema:**
-
-```typescript
-export const listNotesQuerySchema = z.object({
-    q: z.string().optional(),
+// ページネーション
+export const paginationSchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
-    sort: z.enum(['updated', 'created', 'title']).default('updated'),
-});
-
-export type ListNotesQuery = z.infer<typeof listNotesQuerySchema>;
-```
-
-**Response Success (200):**
-
-```typescript
-{
-    success: true;
-    data: Array<{
-        id: string;
-        title: string;
-        content: string; // 先頭200文字のpreview
-        visibility: 'private' | 'public' | 'shared';
-        createdAt: number; // Unix timestamp
-        updatedAt: number;
-    }>;
-    pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        totalPages: number;
-    }
-}
-```
-
-**権限別フィルタリング:**
-
-| ユーザー | 表示対象                           |
-| -------- | ---------------------------------- |
-| 管理者   | 全メモ                             |
-| ゲスト   | `visibility = 'public'` のメモのみ |
-
-**実装例:**
-
-```typescript
-// packages/backend/src/routes/notes.ts
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
-import { listNotesQuerySchema } from '../validators/notes';
-import { listNotes } from '../services/notes/list-notes';
-import { optionalAuthMiddleware } from '../middleware/auth';
-
-export const notesRoutes = new Hono();
-
-notesRoutes.get(
-    '/',
-    optionalAuthMiddleware,
-    zValidator('query', listNotesQuerySchema),
-    async (c) => {
-        const query = c.req.valid('query');
-        const user = c.get('user'); // undefined or User object
-
-        const result = await listNotes({
-            ...query,
-            isAdmin: !!user,
-        });
-
-        return c.json({
-            success: true,
-            data: result.notes,
-            pagination: result.pagination,
-        });
-    },
-);
-```
-
----
-
-### 4.2 メモ詳細取得
-
-**Endpoint:** `GET /api/notes/:id`
-
-**説明:** 特定メモの詳細を取得
-
-**Authentication:** Optional
-
-**Path Parameters:**
-
-```typescript
-{
-    id: string; // Note ULID
-}
-```
-
-**Response Success (200):**
-
-```typescript
-{
-    success: true;
-    data: {
-        id: string;
-        title: string;
-        content: string; // Full Markdown
-        visibility: 'private' | 'public' | 'shared';
-        shareToken: string | null;
-        shareExpiresAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-    }
-}
-```
-
-**Response Error:**
-
-| Status | Code        | 説明                   |
-| ------ | ----------- | ---------------------- |
-| 403    | `FORBIDDEN` | 非公開メモへのアクセス |
-| 404    | `NOT_FOUND` | メモが存在しない       |
-
-**権限チェック:**
-
-```typescript
-const canAccessNote = (note: Note, user?: User): boolean => {
-    // 管理者は全アクセス可
-    if (user) return true;
-
-    // 公開メモはアクセス可
-    if (note.visibility === 'public') return true;
-
-    // それ以外は拒否
-    return false;
-};
-```
-
-**実装例:**
-
-```typescript
-notesRoutes.get('/:id', optionalAuthMiddleware, async (c) => {
-    const id = c.req.param('id');
-    const user = c.get('user');
-
-    const note = await getNoteById(id);
-
-    if (!note) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'NOT_FOUND',
-                    message: 'Note not found',
-                },
-            },
-            404,
-        );
-    }
-
-    if (!canAccessNote(note, user)) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'FORBIDDEN',
-                    message: 'Access denied',
-                },
-            },
-            403,
-        );
-    }
-
-    return c.json({
-        success: true,
-        data: note,
-    });
 });
 ```
 
----
-
-### 4.3 メモ作成
-
-**Endpoint:** `POST /api/notes`
-
-**説明:** 新しいメモを作成
-
-**Authentication:** Required (Admin)
-
-**Request Body:**
+### 2.2 認証関連 (`auth.ts`)
 
 ```typescript
-{
-  title: string;          // 1-200文字
-  content: string;        // 0-1,000,000文字
-  visibility?: 'private' | 'public' | 'shared';  // デフォルト: 'private'
-}
+export const loginSchema = z.object({
+    username: z.string().min(1).max(50), // 空文字不可
+    password: z.string().min(1).max(100),
+});
+
+export const userResponseSchema = z.object({
+    id: ulidSchema,
+    username: z.string(),
+    createdAt: z.date(),
+});
 ```
 
-**Zod Schema:**
+### 2.3 メモ関連 (`notes.ts`)
 
 ```typescript
+// メモ作成・更新
 export const createNoteSchema = z.object({
-    title: z.string().min(1).max(200),
-    content: z.string().max(1_000_000),
+    title: z.string().min(1, 'Title is required').max(200),
+    content: z.string().default(''), // Markdown content
+    coverImage: z.string().url().max(1000).optional().nullable(),
+    icon: z.string().max(10).optional().nullable(), // Emoji or short text
     visibility: z.enum(['private', 'public', 'shared']).default('private'),
 });
 
-export type CreateNoteInput = z.infer<typeof createNoteSchema>;
-```
+export const updateNoteSchema = createNoteSchema.partial();
 
-**Response Success (201):**
-
-```typescript
-{
-    success: true;
-    data: {
-        id: string;
-        title: string;
-        content: string;
-        visibility: 'private' | 'public' | 'shared';
-        shareToken: string | null;
-        shareExpiresAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-    }
-}
-```
-
-**実装例:**
-
-```typescript
-notesRoutes.post(
-    '/',
-    authMiddleware, // Admin only
-    zValidator('json', createNoteSchema),
-    async (c) => {
-        const input = c.req.valid('json');
-
-        const note = await createNote(input);
-
-        return c.json(
-            {
-                success: true,
-                data: note,
-            },
-            201,
-        );
-    },
-);
-```
-
----
-
-### 4.4 メモ更新
-
-**Endpoint:** `PATCH /api/notes/:id`
-
-**説明:** 既存メモを更新
-
-**Authentication:** Required (Admin)
-
-**Path Parameters:**
-
-```typescript
-{
-    id: string; // Note ULID
-}
-```
-
-**Request Body:**
-
-```typescript
-{
-  title?: string;
-  content?: string;
-  visibility?: 'private' | 'public' | 'shared';
-  shareExpiresAt?: number | null;  // Unix timestamp or null (unlimited)
-}
-```
-
-**Zod Schema:**
-
-```typescript
-export const updateNoteSchema = z.object({
-    title: z.string().min(1).max(200).optional(),
-    content: z.string().max(1_000_000).optional(),
+// メモ一覧検索クエリ
+export const listNotesQuerySchema = paginationSchema.extend({
+    q: z.string().optional(), // 検索キーワード
     visibility: z.enum(['private', 'public', 'shared']).optional(),
-    shareExpiresAt: z.number().int().positive().nullable().optional(),
 });
 
-export type UpdateNoteInput = z.infer<typeof updateNoteSchema>;
+// メモレスポンス
+export const noteResponseSchema = z.object({
+    id: ulidSchema,
+    title: z.string(),
+    content: z.string(),
+    coverImage: z.string().nullable(),
+    icon: z.string().nullable(),
+    visibility: z.enum(['private', 'public', 'shared']),
+    shareToken: z.string().uuid().nullable(),
+    shareExpiresAt: z.date().nullable(), // Date object in response
+    createdAt: z.date(),
+    updatedAt: z.date(),
+});
 ```
 
-**Response Success (200):**
+### 2.4 ファイルアップロード (`files.ts`)
+
+request body は `FormData` であるため、Zod スキーマではなく `hono/body-limit` 等で制御するが、レスポンス型は定義する。
 
 ```typescript
-{
-    success: true;
-    data: {
-        id: string;
-        title: string;
-        content: string;
-        visibility: 'private' | 'public' | 'shared';
-        shareToken: string | null;
-        shareExpiresAt: number | null;
-        createdAt: number;
-        updatedAt: number;
-    }
-}
-```
-
-**ビジネスロジック:**
-
-- `visibility` を `'shared'` に変更した場合、自動的に `shareToken` (UUID v4) を生成
-- `visibility` を `'shared'` 以外に変更した場合、`shareToken` と `shareExpiresAt` をクリア
-- `updatedAt` を現在時刻に更新
-
-**実装例:**
-
-```typescript
-notesRoutes.patch(
-    '/:id',
-    authMiddleware,
-    zValidator('json', updateNoteSchema),
-    async (c) => {
-        const id = c.req.param('id');
-        const input = c.req.valid('json');
-
-        const note = await updateNote(id, input);
-
-        if (!note) {
-            return c.json(
-                {
-                    success: false,
-                    error: {
-                        code: 'NOT_FOUND',
-                        message: 'Note not found',
-                    },
-                },
-                404,
-            );
-        }
-
-        return c.json({
-            success: true,
-            data: note,
-        });
-    },
-);
-```
-
----
-
-### 4.5 メモ削除
-
-**Endpoint:** `DELETE /api/notes/:id`
-
-**説明:** メモを削除（論理削除ではなく物理削除）
-
-**Authentication:** Required (Admin)
-
-**Path Parameters:**
-
-```typescript
-{
-    id: string;
-}
-```
-
-**Response Success (200):**
-
-```json
-{
-    "success": true,
-    "data": null
-}
-```
-
-**Response Error:**
-
-| Status | Code        | 説明             |
-| ------ | ----------- | ---------------- |
-| 404    | `NOT_FOUND` | メモが存在しない |
-
-**実装例:**
-
-```typescript
-notesRoutes.delete('/:id', authMiddleware, async (c) => {
-    const id = c.req.param('id');
-
-    const deleted = await deleteNote(id);
-
-    if (!deleted) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'NOT_FOUND',
-                    message: 'Note not found',
-                },
-            },
-            404,
-        );
-    }
-
-    return c.json({
-        success: true,
-        data: null,
-    });
+export const uploadResponseSchema = z.object({
+    id: ulidSchema,
+    url: z.string().url(), // アクセス用URL (/uploads/...)
+    filename: z.string(),
+    originalFilename: z.string(),
+    mimeType: z.string(),
+    size: z.number(),
 });
 ```
 
 ---
 
-### 4.6 共有リンク経由でメモ取得
+## 3. サービス層ロジック (Service Logic)
 
-**Endpoint:** `GET /api/notes/shared/:shareToken`
+### 3.1 AuthService (`auth.service.ts`)
 
-**説明:** 共有トークンでメモを取得
+- **Password Hashing:** `Argon2id` を使用する。
+    - 推奨ライブラリ: `argon2` (npm)
+- **Session Duration:** 7日間 (Sliding Expiration: アクセスのたびに延長は**しない**。セキュリティ重視のため絶対期限とする)。
 
-**Authentication:** Not Required
+#### `login(username, password)`
 
-**Path Parameters:**
+1. `users` テーブル検索。
+2. `argon2.verify(hash, password)` 実行。
+3. 成功時:
+    - Session ID (UUID v4) 生成。
+    - `expiresAt = Now + 7 days`。
+    - `sessions` テーブルに INSERT。
+    - Cookie `session_id` をセット。
+4. 失敗時: `UNAUTHORIZED`。
 
-```typescript
-{
-    shareToken: string; // UUID v4
-}
-```
+### 3.2 NoteService (`note.service.ts`)
 
-**Response Success (200):**
+#### `list(params, currentUser)`
 
-```typescript
-{
-    success: true;
-    data: {
-        id: string;
-        title: string;
-        content: string;
-        createdAt: number;
-        updatedAt: number;
-        // visibility, shareToken, shareExpiresAt は返却しない（セキュリティ）
-    }
-}
-```
+- **権限ロジック (Strict):**
+    - `currentUser` が**非null** (ログイン済): 全てのメモ (`private`, `public`, `shared`) を検索対象とする。ただし `params.visibility` が指定された場合はそれに従う。
+    - `currentUser` が**null** (ゲスト): 自動的に `visibility = 'public'` の条件を強制付与する。`params.visibility` で `private` を指定しても無視（またはエラー）とし、絶対に見せない。
 
-**Response Error:**
+#### `getByShareToken(token)`
 
-| Status | Code        | 説明                           |
-| ------ | ----------- | ------------------------------ |
-| 404    | `NOT_FOUND` | トークンが無効、または期限切れ |
+- **有効期限ロジック:**
+    - `WHERE share_token = ?`
+    - `AND visibility = 'shared'`
+    - `AND (share_expires_at IS NULL OR share_expires_at > NOW())`
+    - これら全てを満たさない場合は `NOT_FOUND` または `Gone`。
 
-**検証ロジック:**
+### 3.3 FileService (`file.service.ts`)
 
-```typescript
-const validateShareToken = async (token: string): Promise<Note | null> => {
-    const note = await db
-        .select()
-        .from(notes)
-        .where(
-            and(
-                eq(notes.shareToken, token),
-                eq(notes.visibility, 'shared'),
-                or(
-                    isNull(notes.shareExpiresAt),
-                    gt(notes.shareExpiresAt, new Date()),
-                ),
-            ),
-        )
-        .get();
+#### `upload(file, currentUser)`
 
-    return note;
-};
-```
-
-**実装例:**
-
-```typescript
-notesRoutes.get('/shared/:shareToken', async (c) => {
-    const shareToken = c.req.param('shareToken');
-
-    const note = await validateShareToken(shareToken);
-
-    if (!note) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'NOT_FOUND',
-                    message: 'Shared link not found or expired',
-                },
-            },
-            404,
-        );
-    }
-
-    // 公開情報のみ返す
-    return c.json({
-        success: true,
-        data: {
-            id: note.id,
-            title: note.title,
-            content: note.content,
-            createdAt: note.createdAt,
-            updatedAt: note.updatedAt,
-        },
-    });
-});
-```
+- **権限:** ログインユーザーのみ実行可能。
+- **制約:**
+    - Max Size: 10MB
+    - Allowed Types: `image/*`, `application/pdf`
+- **保存プロセス:**
+    1. ULID を生成 -> `fileId`。
+    2. 拡張子を抽出。
+    3. 保存ディレクトリ決定: `uploads/YYYY/MM/` (今日の日付)。ディレクトリがなければ作成。
+    4. ファイル名決定: `<fileId>.<ext>`。
+    5. ファイル書き込み。
+    6. `files` テーブルにメタデータ INSERT。
+    7. URL (`/uploads/YYYY/MM/<filename>`) を返却。
 
 ---
 
-## 5. ファイルアップロードAPI (`/api/upload`)
+## 4. API ルート定義 (Hono Routes)
 
-### 5.1 ファイルアップロード
+### 4.1 エンドポイント一覧
 
-**Endpoint:** `POST /api/upload`
+| Method   | Path                 | Auth | Service           | Description                                   |
+| :------- | :------------------- | :--- | :---------------- | :-------------------------------------------- |
+| `POST`   | `/api/auth/login`    | -    | `Auth.login`      | ログイン                                      |
+| `POST`   | `/api/auth/logout`   | User | `Auth.logout`     | ログアウト (Cookie削除)                       |
+| `GET`    | `/api/auth/me`       | -    | `Auth.me`         | 現在のユーザー情報を取得 (未ログインならnull) |
+| `GET`    | `/api/notes`         | Opt  | `Note.list`       | メモ一覧取得                                  |
+| `POST`   | `/api/notes`         | User | `Note.create`     | メモ作成                                      |
+| `GET`    | `/api/notes/:id`     | Opt  | `Note.get`        | メモ詳細取得                                  |
+| `PATCH`  | `/api/notes/:id`     | User | `Note.update`     | メモ更新                                      |
+| `DELETE` | `/api/notes/:id`     | User | `Note.delete`     | メモ削除                                      |
+| `GET`    | `/api/shared/:token` | -    | `Note.getByToken` | 共有メモ取得                                  |
+| `POST`   | `/api/upload`        | User | `File.upload`     | ファイルアップロード (Multipart)              |
 
-**説明:** ファイルをアップロード（画像、動画、PDF等）
-
-**Authentication:** Required (Admin)
-
-**Content-Type:** `multipart/form-data`
-
-**Request Body:**
-
-```typescript
-FormData {
-  file: File;
-}
-```
-
-**許可されるファイルタイプ:**
-
-| カテゴリ | MIME Type                                            | 拡張子                          | 最大サイズ |
-| -------- | ---------------------------------------------------- | ------------------------------- | ---------- |
-| 画像     | `image/png`, `image/jpeg`, `image/gif`, `image/webp` | `.png`, `.jpg`, `.gif`, `.webp` | 10MB       |
-| 動画     | `video/mp4`, `video/webm`                            | `.mp4`, `.webm`                 | 100MB      |
-| PDF      | `application/pdf`                                    | `.pdf`                          | 20MB       |
-| テキスト | `text/plain`, `application/json`                     | `.txt`, `.json`, `.md`          | 5MB        |
-| コード   | Custom validation                                    | `.js`, `.py`, `.sh`, etc.       | 5MB        |
-
-**Response Success (200):**
-
-```typescript
-{
-    success: true;
-    data: {
-        id: string; // File ULID
-        url: string; // 公開URL (例: /uploads/2026/02/xxx.png)
-        filename: string; // サーバー保存ファイル名
-        originalFilename: string;
-        mimeType: string;
-        size: number; // bytes
-    }
-}
-```
-
-**Response Error:**
-
-| Status | Code                | 説明                       |
-| ------ | ------------------- | -------------------------- |
-| 400    | `VALIDATION_ERROR`  | ファイルが添付されていない |
-| 413    | `PAYLOAD_TOO_LARGE` | ファイルサイズ超過         |
-| 415    | `UNSUPPORTED_MEDIA` | 許可されていないファイル型 |
-
-**バリデーションロジック:**
-
-```typescript
-import { extname } from 'path';
-
-const ALLOWED_MIME_TYPES = new Set([
-    'image/png',
-    'image/jpeg',
-    'image/gif',
-    'image/webp',
-    'video/mp4',
-    'video/webm',
-    'application/pdf',
-    'text/plain',
-    'application/json',
-]);
-
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-
-export const validateFile = (file: File): void => {
-    if (!ALLOWED_MIME_TYPES.has(file.type)) {
-        throw new Error('Unsupported file type');
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-        throw new Error('File size exceeds limit');
-    }
-
-    // 拡張子チェック（二重拡張子攻撃対策）
-    const ext = extname(file.name).toLowerCase();
-    const validExtensions = [
-        '.png',
-        '.jpg',
-        '.jpeg',
-        '.gif',
-        '.webp',
-        '.mp4',
-        '.webm',
-        '.pdf',
-        '.txt',
-        '.json',
-        '.md',
-    ];
-
-    if (!validExtensions.includes(ext)) {
-        throw new Error('Invalid file extension');
-    }
-};
-```
-
-**実装例:**
+### 4.2 Hono 実装例 (Upload)
 
 ```typescript
 // packages/backend/src/routes/upload.ts
+
 import { Hono } from 'hono';
-import { authMiddleware } from '../middleware/auth';
-import { saveFile } from '../services/uploads/save-file';
-import { validateFile } from '../services/uploads/validate-file';
-
-export const uploadRoutes = new Hono();
-
-uploadRoutes.post('/', authMiddleware, async (c) => {
-    const body = await c.req.parseBody();
-    const file = body['file'];
-
-    if (!file || !(file instanceof File)) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'VALIDATION_ERROR',
-                    message: 'No file uploaded',
-                },
-            },
-            400,
-        );
-    }
-
-    try {
-        validateFile(file);
-    } catch (error) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'UNSUPPORTED_MEDIA',
-                    message: error.message,
-                },
-            },
-            415,
-        );
-    }
-
-    const savedFile = await saveFile(file);
-
-    return c.json({
-        success: true,
-        data: {
-            id: savedFile.id,
-            url: savedFile.url,
-            filename: savedFile.filename,
-            originalFilename: savedFile.originalFilename,
-            mimeType: savedFile.mimeType,
-            size: savedFile.size,
-        },
-    });
-});
-```
-
-**ファイル保存処理:**
-
-```typescript
-// packages/backend/src/services/uploads/save-file.ts
-import { ulid } from 'ulid';
-import { join, extname } from 'path';
-import { mkdir, writeFile } from 'fs/promises';
-import { db } from '../../db/client';
-import { files } from '../../db/schema';
-
-export const saveFile = async (file: File) => {
-    const id = ulid();
-    const ext = extname(file.name);
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
-
-    const filename = `${id}${ext}`;
-    const relativePath = `uploads/${year}/${month}/${filename}`;
-    const absolutePath = join(process.cwd(), relativePath);
-
-    // ディレクトリ作成（存在しなければ）
-    await mkdir(join(process.cwd(), `uploads/${year}/${month}`), {
-        recursive: true,
-    });
-
-    // ファイル書き込み
-    const buffer = await file.arrayBuffer();
-    await writeFile(absolutePath, Buffer.from(buffer));
-
-    // DB保存
-    const fileRecord = {
-        id,
-        filename,
-        originalFilename: file.name,
-        path: relativePath,
-        mimeType: file.type,
-        size: file.size,
-        noteId: null,
-        uploadedAt: new Date(),
-    };
-
-    await db.insert(files).values(fileRecord);
-
-    return {
-        ...fileRecord,
-        url: `/${relativePath}`,
-    };
-};
-```
-
----
-
-## 6. 静的ファイル配信
-
-**Endpoint:** `GET /uploads/*`
-
-**説明:** アップロードされたファイルを配信
-
-**Authentication:** Not Required
-
-**Hono Static Middleware:**
-
-```typescript
-// packages/backend/src/app.ts
-import { Hono } from 'hono';
-import { serveStatic } from '@hono/node-server/serve-static';
+import { bodyLimit } from 'hono/body-limit';
+import { FileService } from '../services/file.service';
 
 const app = new Hono();
 
-// 静的ファイル配信
-app.use(
-    '/uploads/*',
-    serveStatic({
-        root: './',
-        onNotFound: (path, c) => {
-            return c.json({ error: 'File not found' }, 404);
-        },
+app.post(
+    '/',
+    bodyLimit({
+        maxSize: 10 * 1024 * 1024, // 10MB
+        onError: (c) =>
+            c.json(
+                { success: false, error: { code: 'PAYLOAD_TOO_LARGE' } },
+                413,
+            ),
     }),
-);
-```
+    async (c) => {
+        const user = c.get('user');
+        if (!user)
+            return c.json(
+                { success: false, error: { code: 'UNAUTHORIZED' } },
+                401,
+            );
 
-**セキュリティ考慮:**
+        const body = await c.req.parseBody();
+        const file = body['file'];
 
-- **Directory Traversal 対策:** Hono の `serveStatic` がパス検証を行う
-- **実行権限:** `uploads/` ディレクトリには実行権限を付与しない
-- **Content-Type:** 正しいMIMEタイプを返却（XSS対策）
-
----
-
-## 7. Hono RPC 型定義
-
-### 7.1 APIクライアント生成
-
-```typescript
-// packages/frontend/src/lib/api-client.ts
-import { hc } from 'hono/client';
-import type { AppType } from '../../../backend/src/app';
-
-export const apiClient = hc<AppType>('/api', {
-    headers: {
-        'Content-Type': 'application/json',
-    },
-    credentials: 'include', // Cookie送信
-});
-```
-
-### 7.2 フロントエンドでの使用例
-
-```typescript
-// packages/frontend/src/features/notes/hooks/use-notes.ts
-import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
-
-export const useNotes = (query?: string) => {
-    return useQuery({
-        queryKey: ['notes', query],
-        queryFn: async () => {
-            const response = await apiClient.notes.$get({
-                query: { q: query, page: '1', limit: '20' },
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch notes');
-            }
-
-            return await response.json();
-        },
-    });
-};
-```
-
----
-
-## 8. ミドルウェア実装
-
-### 8.1 認証ミドルウェア
-
-```typescript
-// packages/backend/src/middleware/auth.ts
-import type { Context, Next } from 'hono';
-import { getCookie } from 'hono/cookie';
-import { getUserFromSession } from '../services/auth/get-user-from-session';
-
-export const authMiddleware = async (c: Context, next: Next) => {
-    const sessionToken = getCookie(c, 'session_token');
-
-    if (!sessionToken) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'UNAUTHORIZED',
-                    message: 'Authentication required',
-                },
-            },
-            401,
-        );
-    }
-
-    const user = await getUserFromSession(sessionToken);
-
-    if (!user) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'UNAUTHORIZED',
-                    message: 'Invalid or expired session',
-                },
-            },
-            401,
-        );
-    }
-
-    c.set('user', user);
-    await next();
-};
-```
-
-### 8.2 オプショナル認証ミドルウェア
-
-```typescript
-export const optionalAuthMiddleware = async (c: Context, next: Next) => {
-    const sessionToken = getCookie(c, 'session_token');
-
-    if (sessionToken) {
-        const user = await getUserFromSession(sessionToken);
-        if (user) {
-            c.set('user', user);
-        }
-    }
-
-    await next();
-};
-```
-
-### 8.3 CSRF保護ミドルウェア
-
-```typescript
-// packages/backend/src/middleware/csrf.ts
-import { csrf } from 'hono/csrf';
-
-export const csrfMiddleware = csrf({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-});
-```
-
-### 8.4 エラーハンドリングミドルウェア
-
-```typescript
-// packages/backend/src/middleware/error-handler.ts
-import type { Context, Next } from 'hono';
-import { ZodError } from 'zod';
-
-export const errorHandler = async (c: Context, next: Next) => {
-    try {
-        await next();
-    } catch (error) {
-        console.error('Error:', error);
-
-        if (error instanceof ZodError) {
+        if (!file || !(file instanceof File)) {
             return c.json(
                 {
                     success: false,
-                    error: {
-                        code: 'VALIDATION_ERROR',
-                        message: 'Invalid request parameters',
-                        details: error.errors,
-                    },
+                    error: { code: 'BAD_REQUEST', message: 'No file uploaded' },
                 },
                 400,
             );
         }
 
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'INTERNAL_SERVER_ERROR',
-                    message: 'An unexpected error occurred',
-                },
-            },
-            500,
-        );
-    }
-};
+        const result = await FileService.upload(file, user);
+        return c.json({ success: true, data: result });
+    },
+);
 ```
 
 ---
 
-## 9. レート制限
+## 5. セキュリティ対策 (Security Implementation)
 
-### 9.1 ログインエンドポイント制限
+### 5.1 CSRF対策
 
-```typescript
-import { rateLimiter } from 'hono-rate-limiter';
+Hono の `csrf` ミドルウェアを全てのミューテーション（POST, PATCH, DELETE）ルートに適用する。
+JSON API であっても、Cookie認証を利用するため必須。
 
-const loginLimiter = rateLimiter({
-    windowMs: 15 * 60 * 1000, // 15分
-    max: 5, // 最大5回
-    standardHeaders: 'draft-7',
-    keyGenerator: (c) => c.req.header('x-forwarded-for') || 'unknown',
-});
+### 5.2 レート制限 (Rate Limiting)
 
-authRoutes.post('/login', loginLimiter /* ... */);
+- ログイン: 5 req / 1 min (IPベース)
+- ファイルアップロード: 10 req / 1 min (Userベース)
+    - 大量アップロードによるDoS防止。
+
+### 5.3 セキュリティヘッダー
+
+Hono の `secureHeaders` ミドルウェアを使用。
+特に `Content-Security-Policy` は、アップロードした画像 (`/uploads/...`) を表示できるように適切に設定する。
+
 ```
-
-### 9.2 アップロードエンドポイント制限
-
-```typescript
-const uploadLimiter = rateLimiter({
-    windowMs: 60 * 1000, // 1分
-    max: 10, // 最大10回
-});
-
-uploadRoutes.post('/', uploadLimiter, authMiddleware /* ... */);
+default-src 'self';
+img-src 'self' data: blob:;
+style-src 'self' 'unsafe-inline';
 ```
-
----
-
-## 10. API テスト例
-
-### 10.1 ログインテスト
-
-```typescript
-// packages/backend/src/__tests__/auth.test.ts
-import { describe, it, expect } from 'vitest';
-import { testClient } from 'hono/testing';
-import { app } from '../app';
-
-describe('POST /api/auth/login', () => {
-    it('should login with valid credentials', async () => {
-        const res = await testClient(app).auth.login.$post({
-            json: {
-                username: 'admin',
-                password: 'ChangeMe123!',
-            },
-        });
-
-        expect(res.status).toBe(200);
-        const data = await res.json();
-        expect(data.success).toBe(true);
-        expect(data.data.user.username).toBe('admin');
-    });
-
-    it('should reject invalid credentials', async () => {
-        const res = await testClient(app).auth.login.$post({
-            json: {
-                username: 'admin',
-                password: 'wrong-password',
-            },
-        });
-
-        expect(res.status).toBe(401);
-        const data = await res.json();
-        expect(data.success).toBe(false);
-        expect(data.error.code).toBe('INVALID_CREDENTIALS');
-    });
-});
-```
-
----
-
-## 11. 参考資料
-
-- [Hono Documentation](https://hono.dev/)
-- [Zod Documentation](https://zod.dev/)
-- [TanStack Query - Data Fetching](https://tanstack.com/query/latest/docs/framework/react/guides/queries)
-- [OWASP API Security Top 10](https://owasp.org/www-project-api-security/)
