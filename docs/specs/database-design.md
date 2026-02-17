@@ -317,36 +317,39 @@ Drizzle Kit を使用したスキーマ管理フロー。
 
 SQLite FTS5 を利用した検索機能の実装方針。
 
+**重要:** `notes` の主キーは ULID (TEXT) だが、FTS5 の `content_rowid` は **integer** 必須のため、SQLite の暗黙的 `rowid` を使用する。
+
 ```sql
 -- マイグレーションSQL (手動追加)
+-- content_rowid='rowid' で notes の暗黙的 rowid と紐付け
 CREATE VIRTUAL TABLE notes_fts USING fts5(
-  id UNINDEXED,
   title,
   content,
   content='notes',
-  content_rowid='id',
+  content_rowid='rowid',
   tokenize='trigram' -- 日本語検索のためにtrigram推奨
 );
 
 -- トリガー (Notesテーブルとの同期)
+-- new.rowid / old.rowid は notes の暗黙的 integer rowid
 CREATE TRIGGER notes_ai AFTER INSERT ON notes BEGIN
-  INSERT INTO notes_fts(id, title, content) VALUES (new.id, new.title, new.content);
+  INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content);
 END;
 CREATE TRIGGER notes_ad AFTER DELETE ON notes BEGIN
-  INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
+  INSERT INTO notes_fts(notes_fts, rowid) VALUES ('delete', old.rowid);
 END;
 CREATE TRIGGER notes_au AFTER UPDATE ON notes BEGIN
-  INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.id, old.title, old.content);
-  INSERT INTO notes_fts(id, title, content) VALUES (new.id, new.title, new.content);
+  INSERT INTO notes_fts(notes_fts, rowid) VALUES ('delete', old.rowid);
+  INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content);
 END;
 ```
 
 **実装メモ:**
 
 - Drizzle ORM は FTS5 をネイティブサポートしていないため、検索時は `sql` タグを用いた Raw Query を使用する。
-- 検索クエリ例:
+- 検索クエリ例（`notes` と JOIN して ULID のメモ一覧を取得）:
     ```typescript
-    const result = await db.all(
-        sql`SELECT * FROM notes_fts WHERE notes_fts MATCH ${query} ORDER BY rank`,
+    const rows = await db.all(
+        sql`SELECT n.* FROM notes n INNER JOIN notes_fts ON n.rowid = notes_fts.rowid WHERE notes_fts MATCH ${query}`,
     );
     ```

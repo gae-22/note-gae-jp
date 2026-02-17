@@ -637,7 +637,7 @@ for (const note of notes) {
 - [ ] CSRF対策（`sameSite` Cookie設定）
 - [ ] 認証・認可チェック（middleware使用）
 - [ ] ファイルアップロードの検証（MIME/拡張子/サイズ）
-- [ ] パスワードのハッシュ化（bcrypt使用）
+- [ ] パスワードのハッシュ化（Argon2id使用）
 - [ ] 機密情報のログ出力禁止
 
 ---

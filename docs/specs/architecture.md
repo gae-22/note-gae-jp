@@ -108,15 +108,14 @@ NotionライクなMarkdownベースの個人用メモ帳アプリケーション
 
 ### 3.1 開発環境・ツール
 
-| カテゴリ        | 技術                | バージョン  | 用途               |
-| --------------- | ------------------- | ----------- | ------------------ |
-| Package Manager | pnpm                | latest      | 高速な依存関係管理 |
-| Runtime         | Node.js             | LTS (v22.x) | サーバー実行環境   |
-| Language        | TypeScript          | 5.x         | 型安全なコード記述 |
-| Build Tool      | Vite                | 6.x         | 高速ビルド・HMR    |
-| Linter          | ESLint              | 9.x         | コード品質チェック |
-| Formatter       | Prettier            | 3.x         | コード整形         |
-| Pre-commit      | Husky + lint-staged | latest      | コミット前チェック |
+| カテゴリ         | 技術                | バージョン  | 用途               |
+| ---------------- | ------------------- | ----------- | ------------------ |
+| Package Manager  | pnpm                | latest      | 高速な依存関係管理 |
+| Runtime          | Node.js             | LTS (v22.x) | サーバー実行環境   |
+| Language         | TypeScript          | 5.x         | 型安全なコード記述 |
+| Build Tool       | Vite                | 6.x         | 高速ビルド・HMR    |
+| Linter/Formatter | Biome               | latest      | コード品質・整形   |
+| Pre-commit       | Husky + lint-staged | latest      | コミット前チェック |
 
 ### 3.2 フロントエンド技術スタック
 
@@ -142,7 +141,7 @@ NotionライクなMarkdownベースの個人用メモ帳アプリケーション
 | Framework          | Hono                    | 高速、軽量、Edge対応、TypeScript完全サポート |
 | RPC Client         | hono/client             | エンドツーエンド型安全性                     |
 | Validation         | Zod                     | フロントエンドとスキーマ共有可能             |
-| Password Hashing   | bcrypt / argon2         | OWASP推奨のハッシュアルゴリズム              |
+| Password Hashing   | Argon2id (argon2)       | OWASP推奨のハッシュアルゴリズム              |
 | Session Management | Hono Session Middleware | HttpOnly Cookie、SameSite設定                |
 | CSRF Protection    | Hono CSRF Middleware    | トークンベースのCSRF対策                     |
 | File Upload        | Hono Multipart          | マルチパートフォームデータ処理               |
@@ -187,16 +186,13 @@ note-gae-jp/
 ├── docs/                      # 設計書・ドキュメント
 │   └── specs/
 │       ├── architecture.md    # このファイル
+│       ├── spec.md            # プロジェクト概要・要件
 │       ├── database-design.md
 │       ├── api-design.md
 │       ├── frontend-design.md
-│       ├── features/
-│       │   ├── auth.md
-│       │   ├── notes.md
-│       │   ├── upload.md
-│       │   └── sharing.md
 │       ├── security.md
-│       └── development-guidelines.md
+│       ├── development-guidelines.md
+│       └── implementation_detail.md
 │
 ├── data/                      # SQLiteデータベース
 │   └── data.db
@@ -510,6 +506,29 @@ NODE_ENV=production pnpm --filter backend db:migrate
 # Start production server
 NODE_ENV=production pm2 start packages/backend/dist/index.js
 ```
+
+### 6.3 マイグレーション運用方針
+
+- **本番適用:** デプロイ前に手動で `db:migrate` を実行。`drizzle-kit push` は使用しない。
+- **ロールバック:** マイグレーションファイルにロールバックSQLを用意するか、別途ダウンマイグレーションスクリプトを管理する。
+- **自動適用:** アプリ起動時の自動マイグレーションは開発環境のみ。本番ではデプロイパイプラインで明示的に実行。
+
+### 6.4 CI/CD（推奨構成）
+
+- **GitHub Actions** によるビルド・テスト・Lint の自動実行
+- 本番デプロイ: マージ時または手動トリガーで、ビルド → マイグレーション → デプロイ を順次実行
+
+### 6.5 環境変数
+
+必須の環境変数一覧。詳細は [implementation_detail.md](./implementation_detail.md#3-環境変数) を参照。
+
+| 変数名           | 必須       | 説明                                         |
+| ---------------- | ---------- | -------------------------------------------- |
+| `NODE_ENV`       | Yes        | `development` / `production`                 |
+| `SESSION_SECRET` | Yes        | セッション暗号化用（32文字以上推奨）         |
+| `DATABASE_PATH`  | No         | SQLite DBパス（デフォルト: `data/data.db`）  |
+| `UPLOADS_DIR`    | No         | アップロード保存先（デフォルト: `uploads/`） |
+| `FRONTEND_URL`   | Yes (本番) | CSRF検証用のフロントエンドURL                |
 
 ---
 

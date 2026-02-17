@@ -14,6 +14,7 @@ UI/UX は Notion をベンチマークとし、直感的で美しい操作性を
 - **State Management:** TanStack Query v5 (Server State), Nuqs (URL State)
 - **Styling:** Tailwind CSS v4, shadcn/ui (Radix UI base)
 - **Editor:** Tiptap (Headless, Block-based feel)
+- **通知 (Toast):** sonner（shadcn/ui と相性が良い）
 
 ### 1.2 ディレクトリ構造 (Feature-based)
 
@@ -79,7 +80,19 @@ export interface Note {
 }
 ```
 
-### 2.3 API Response Wrapper
+### 2.3 ListNotesResponse（ページネーション付き一覧）
+
+```typescript
+export interface ListNotesResponse {
+    items: Note[];
+    total: number;
+    page: number;
+    limit: number;
+    hasNext: boolean;
+}
+```
+
+### 2.4 API Response Wrapper
 
 ```typescript
 export type ApiResponse<T> =
@@ -193,29 +206,62 @@ Notionライクな操作感を実現するための設定。
 - `routes/shared.$token.tsx`:
     - 共有メモ閲覧画面 (認証不要)。
     - ヘッダー等は簡易的なものにする。
+- `routes/404.tsx`:
+    - 404 Not Found ページ。存在しないパスやメモID、期限切れ共有リンクで表示。
+- `routes/500.tsx`:
+    - 500 Server Error ページ。予期せぬエラー発生時に表示（Error Boundary 経由）。
+
+### 5.1 エラーページの仕様
+
+| ルート | 表示条件                                         | UI                                                     |
+| ------ | ------------------------------------------------ | ------------------------------------------------------ |
+| 404    | 存在しないパス、削除済みメモ、期限切れ共有リンク | メッセージ「ページが見つかりません」、トップへのリンク |
+| 500    | Error Boundary で捕捉した未処理エラー            | メッセージ「エラーが発生しました」、リロードボタン     |
 
 ---
 
-## 6. フック仕様 (Custom Hooks Specification)
+## 6. エラー・ローディング・通知
 
-### 6.1 `useNotes(params)`
+### 6.1 エラーバウンダリ (Error Boundary)
 
-- **Params:** `{ q?: string, visibility?: string, page?: number }`
-- **Returns:** `{ notes: Note[], total: number, isLoading: boolean }`
+- **配置:** `routes/__root.tsx` の直下で `ErrorBoundary` をラップ。
+- **フォールバック:** 500ページへリダイレクト、またはインラインでエラーメッセージを表示。
+- **ログ:** 本番環境では Sentry 等にエラーを送信することを推奨。
+
+### 6.2 ローディング状態 (Loading States)
+
+- **ページ単位:** TanStack Router の `pendingComponent` でスケルトンまたはスピナーを表示。
+- **コンポーネント単位:** `isLoading` 時に shadcn/ui の `Skeleton` を使用。
+- **エディタ:** 初回読み込み中はプレースホルダー表示。
+
+### 6.3 トースト通知 (Toast)
+
+- **ライブラリ:** sonner を使用。`<Toaster />` を Root に配置。
+- **成功:** メモ保存、ログアウト完了等で `toast.success()` を呼び出す。
+- **失敗:** API エラー時に `toast.error()` でエラーメッセージを表示。ユーザー向けメッセージは `error.message` をそのまま使わず、エラーコードに応じて文言をマッピングする。
+
+---
+
+## 7. フック仕様 (Custom Hooks Specification)
+
+### 7.1 `useNotes(params)`
+
+- **Params:** `{ q?: string, visibility?: string, page?: number, limit?: number }`
+- **Returns:** `{ items: Note[], total: number, page: number, limit: number, hasNext: boolean, isLoading: boolean }`
 - **Behavior:**
-    - パラメータ変更時に自動で再取得 (KeepPreviousData: true)。
+    - パラメータ変更時に自動で再取得 (`placeholderData: keepPreviousData` で前回データを表示しつつ更新)。
 
-### 6.2 `useNoteMutation()`
+### 7.2 `useNoteMutation()`
 
 - **Returns:**
-    - `createNote: (data: CreateNoteDto) => Promise<Note>`
+    - `createNote: (data: CreateNoteDto) => Promise<Note>` … `shareDuration` は visibility='shared' 時のみ指定
     - `updateNote: (id: string, data: UpdateNoteDto) => Promise<Note>`
     - `deleteNote: (id: string) => Promise<void>`
 - **Side Effects:**
     - 成功時: `toast.success` 表示、及び `noteKeys.lists()` のクエリ無効化 (Invalidate)。
     - 失敗時: `toast.error` 表示。
 
-### 6.3 `useUpload()`
+### 7.3 `useUpload()`
 
 - **Returns:** `{ upload: (file: File) => Promise<string>, isUploading: boolean }`
 - **Behavior:**

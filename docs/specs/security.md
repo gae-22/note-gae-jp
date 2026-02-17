@@ -26,12 +26,25 @@
 
 #### パスワードハッシュ化
 
-```typescript
-import bcrypt from 'bcryptjs';
+本プロジェクトでは **Argon2id** を使用する（OWASP推奨、bcrypt より耐性が高い）。
 
-// bcrypt でハッシュ化（cost factor: 10）
+```typescript
+import argon2 from 'argon2';
+
+// Argon2id でハッシュ化
 const hashPassword = async (password: string): Promise<string> => {
-    return await bcrypt.hash(password, 10);
+    return await argon2.hash(password, {
+        type: argon2.argon2id,
+        memoryCost: 65536, // 64MB
+        timeCost: 3,
+    });
+};
+
+const verifyPassword = async (
+    hash: string,
+    password: string,
+): Promise<boolean> => {
+    return await argon2.verify(hash, password);
 };
 ```
 
@@ -43,8 +56,8 @@ const hashPassword = async (password: string): Promise<string> => {
 
 **OWASP推奨事項:**
 
-- bcrypt, scrypt, argon2 のいずれかを使用
-- ソルトは自動生成（bcryptは自動）
+- Argon2id を優先（bcrypt, scrypt も可）
+- ソルトは自動生成（argon2 は自動）
 - ペッパーは使用しない（DBと分離できないため）
 
 ---
@@ -53,8 +66,10 @@ const hashPassword = async (password: string): Promise<string> => {
 
 #### セッションCookie設定
 
+Cookie名は `session_id` に統一する。
+
 ```typescript
-setCookie(c, 'session_token', token, {
+setCookie(c, 'session_id', token, {
     httpOnly: true, // JavaScript からアクセス不可（XSS対策）
     secure: true, // HTTPS のみ（本番環境）
     sameSite: 'Lax', // CSRF対策
@@ -149,6 +164,8 @@ authRoutes.post('/login', loginLimiter /* ... */);
 
 **レート制限設定:**
 
+全ドキュメントで統一。api-design.md の「5. セキュリティ対策」も参照。
+
 | エンドポイント     | 制限        | 理由                 |
 | ------------------ | ----------- | -------------------- |
 | `POST /auth/login` | 15分間に5回 | ブルートフォース対策 |
@@ -239,8 +256,8 @@ app.use('*', cspMiddleware);
 ### 4.1 SameSite Cookie
 
 ```typescript
-// session_token Cookie に SameSite=Lax を設定
-setCookie(c, 'session_token', token, {
+// session_id Cookie に SameSite=Lax を設定
+setCookie(c, 'session_id', token, {
     sameSite: 'Lax', // クロスサイトリクエストではCookieを送信しない
     // ...
 });

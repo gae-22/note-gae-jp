@@ -64,7 +64,7 @@ Notionのような高性能なMarkdownエディタを中心に据えた、個人
 
 - **パフォーマンス:** 初期表示 1秒以内、エディタ入力遅延なし
 - **セキュリティ:** XSS/CSRF対策、SQLインジェクション対策（ORM利用）、セキュアな認証
-- **コード品質:** TypeScript Strict Mode、ESLint/Prettier (Biome) の適用
+- **コード品質:** TypeScript Strict Mode、Biome（Lint・フォーマット）の適用
 - **テスト:** Vitest (Unit/Integration), Playwright (E2E) による自動テスト
 
 ---
@@ -74,15 +74,19 @@ Notionのような高性能なMarkdownエディタを中心に据えた、個人
 本プロジェクトの仕様は以下のドキュメント群によって定義される。
 実装時は各詳細設計書を参照すること。
 
-1. **[データベース設計書 (Database Design)](./database-design.md)**
+1. **[アーキテクチャ設計書 (Architecture)](./architecture.md)**
+    - システム構成、レイヤー、データフロー、デプロイ、環境変数
+2. **[データベース設計書 (Database Design)](./database-design.md)**
     - データベーススキーマ、インデックス、リレーション定義
-2. **[API設計書 (API Design)](./api-design.md)**
+3. **[API設計書 (API Design)](./api-design.md)**
     - APIエンドポイント、リクエスト/レスポンス型定義、バリデーションルール、サービスロジック
-3. **[フロントエンド設計書 (Frontend Design)](./frontend-design.md)**
+4. **[フロントエンド設計書 (Frontend Design)](./frontend-design.md)**
     - コンポーネント設計、状態管理、ディレクトリ構成、フック実装詳細
-4. **[セキュリティ設計書 (Security Design)](./security.md)**
+5. **[セキュリティ設計書 (Security Design)](./security.md)**
     - セキュリティ対策の詳細（※適宜更新）
-5. **[開発ガイドライン (Development Guidelines)](./development-guidelines.md)**
+6. **[開発ガイドライン (Development Guidelines)](./development-guidelines.md)**
     - コーディング規約、Git運用、テスト方針
+7. **[実装詳細ガイド (Implementation Detail)](./implementation_detail.md)**
+    - 実装順序、環境変数、テスト戦略、デプロイ・CI/CD
 
 ---
