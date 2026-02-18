@@ -188,6 +188,18 @@ Notionライクな操作感を実現するための設定。
     - エディタへのドラッグ＆ドロップ時に `handleDrop` イベントをフック。
     - `POST /api/upload` を実行し、一時的な `assetId` / `tempUrl` を受け取る。クライアントはプレースホルダを差し込み、メモ保存時に `assetId` を最終確定 (finalize) するワークフローを推奨する。完成時は `editor.chain().focus().setImage({ src: finalUrl }).run()` で差し替える。
 
+    ### 画像最適化と CDN
+    - クライアントはオリジナル画像をアップロードし、サーバー側で複数サイズとフォーマット（AVIF, WebP, JPEG/PNG）を生成して CDN に配信する設計を推奨。
+    - 生成するバリエーション例: widths = [320, 640, 960, 1280, 1920]。品質パラメータ（例: q=75）をサーバー/処理パイプラインで制御する。
+    - HTML 側は `srcset` / `sizes` を利用または `picture` 要素でフォーマットのフォールバックを提供。例: AVIF -> WebP -> JPEG。
+    - エディタ挿入時はまず `tempUrl` を表示し、最終化された `finalUrl`（CDN 上の最適化済み URL）で差し替える。エディタ表示では `loading="lazy"` と `decoding="async"` を推奨。
+    - クライアントサイドで軽量なリサイズ（プレビュー向け）を行い、アップロード帯域を節約する。ただし高品質な最終出力はサーバー側で生成すること。
+    - サーバー側処理ツール: `libvips`（sharp も可）。処理は非同期ジョブ（ワーカーキュー）で行い、処理完了時に CDN へアップロードし署名済み URL を返す。
+    - CDN とキャッシュ: `Cache-Control: public, max-age=31536000, immutable` を設定し、ファイル名（URL）にバージョン/ハッシュを含める。動的パラメータ（例: `?w=`）での配信は CDN のオリジン処理/リバースプロキシで行う。
+    - セキュリティ: 非公開コンテンツは署名付き URL または認証付きオリジン経由で配信する。公開画像は公開 CDN 上に配置してブラウザキャッシュを最大化する。
+    - プレースホルダー: ぼかしプレースホルダー（low-quality image placeholder, LQIP）や小サイズのベース64を提供して UX を向上させる。
+    - Editor の `useUpload` はアップロード結果として `finalUrl` とメタ情報（width, height, blurhash/placeholder）を返すようにする。
+
 ### 4.2 NoteLayout (Header)
 
 - **Cover Image:**

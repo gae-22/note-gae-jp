@@ -37,6 +37,69 @@
 
 ---
 
+## 4. `packages/shared` の型共有・ビルド戦略（推奨）
+
+Monorepo で Zod スキーマや Type を安全に共有するための実践的な方針を示します。`packages/shared` は型とバリデーションの唯一の信頼できる情報源（source of truth）にします。
+
+### 4.1 目的
+
+- フロントエンドとバックエンドで型を一致させる。
+- 日付（`Date`）や `z.date()` と JSON のシリアライズ差（string <-> Date）による実行時エラーを回避する。
+
+### 4.2 基本ルール
+
+1. **Zod を中心に定義する**: すべての API 入出力型は `Zod` スキーマを `packages/shared` に置き、`export` する（例: `createNoteSchema`, `noteResponseSchema`）。
+2. **スキーマは入力（raw JSON）と内部表現（runtime）を分ける**:
+    - `Api` 向けスキーマ (受信/送信 JSON): 日付は `z.string().datetime()` を使うか、`z.preprocess` で受け入れる形にする。例: `noteResponseApiSchema`。
+    - `Domain`/Server 内部スキーマ: `z.date()` を使う（DB やサービス層での利用）。例: `noteResponseDomainSchema`。
+3. **シリアライザ/パーサを用意する**: `shared` に `toApi()` / `fromApi()` ヘルパーを置き、`Date` の変換を一箇所で行う。
+
+### 4.3 具体例（パターン）
+
+```typescript
+// packages/shared/src/schemas/notes.ts
+import { z } from 'zod';
+
+export const noteResponseDomainSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+    createdAt: z.date(),
+});
+
+// API 表現: ISO-8601 strings
+export const noteResponseApiSchema = z.object({
+    id: z.string(),
+    title: z.string(),
+    createdAt: z.string().datetime(),
+});
+
+export type NoteDomain = z.infer<typeof noteResponseDomainSchema>;
+export type NoteApi = z.infer<typeof noteResponseApiSchema>;
+
+export const toApi = (d: NoteDomain): NoteApi => ({
+    ...d,
+    createdAt: d.createdAt.toISOString(),
+});
+
+export const fromApi = (a: NoteApi): NoteDomain => ({
+    ...a,
+    createdAt: new Date(a.createdAt),
+});
+```
+
+### 4.4 ビルド / エクスポート
+
+- `packages/shared` は `tsup` や `tsc` を使って `dist/` を吐き、`package.json` の `exports` と `types` を設定してください。開発時は `pnpm -w` のワークスペース参照で TypeScript の型をそのまま参照できますが、CI/Production 用にビルド出力を用意することで取り込みのブレを減らせます。
+- 例 `package.json` の重要スクリプト:
+    - `build`: `tsup src/index.ts --format cjs,esm --dts`
+    - `dev`: `pnpm -w --filter backend dev` 等でワークスペースを利用
+
+### 4.5 開発フロー推奨
+
+1. `shared` に Zod スキーマを作る。2. バックエンドは `fromApi()` を使って受信データを内部表現（Date）に変換して処理。3. バックエンドのレスポンスは `toApi()` を用いて JSON シリアライズして返却。4. フロントエンドは受信 JSON を `shared` の `noteResponseApiSchema.parse()` でバリデートし、必要ならパーサで Domain に変換する。
+
+この設計により「Zod を single source of truth」としつつ、Date の扱いに起因する実行時エラーを防ぎます。
+
 ## 2. 実装の進め方 (Workflow)
 
 矛盾のない実装を行うための推奨フロー:
