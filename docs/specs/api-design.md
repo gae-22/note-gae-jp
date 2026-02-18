@@ -68,6 +68,40 @@
 
 ---
 
+### 1.4 日付のシリアライズ（API 表現）
+
+API のリクエスト/レスポンスで用いる日時は一貫して ISO 8601 形式の文字列（例: `2026-02-19T12:34:56.000Z`）を使用することを明記します。内部では SQLite に Unix Timestamp（integer）で保存しますが、HTTP JSON ペイロードは文字列を期待します。
+
+- サーバー側の Zod スキーマ例（受信）: `z.string().datetime()` または `z.preprocess((v) => new Date(v), z.date())` を用いる。
+- クライアント側の型は `string`（ISO 8601）を扱い、必要に応じて `Date` にパースする。
+
+この方針により、`z.date()` のみをそのまま API スキーマに使う混乱を避け、クライアント/サーバ間のシリアライズを明確化します。
+
+### 1.5 セッション Cookie の運用（明確化）
+
+`session_id` Cookie には、`sessions` テーブルで管理する **セッションのトークン** (`sessions.token`) を格納するものとします。実装上の流れ:
+
+- ログイン成功時にサーバは `token`（UUID v4 または十分なエントロピーをもつランダム文字列）を生成し、`sessions` テーブルに `userId, token, expiresAt` を INSERT します。
+- レスポンスでは `Set-Cookie: session_id=<token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=...` を返します。
+- リクエスト受信時は `session_id` Cookie の値を `sessions.token` と照合して `user` を特定します（`sessions.id` ではないことに注意）。
+
+この方式により、セッションの無効化（DB 側で `DELETE FROM sessions WHERE token = ?`）が容易になります。
+
+### 1.6 SameSite / CORS の展開例
+
+デプロイ topology により Cookie の SameSite 設定は変わります。以下を参考にしてください。
+
+- **同一オリジン（例: `https://example.com` がフロント・バックとも同一）**
+    - 推奨: `SameSite=Lax; Secure`。
+    - `Set-Cookie: session_id=<token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800`
+
+- **クロスオリジン（フロントが `https://app.example.com`、API が `https://api.example.com` などサブドメインは許容されるが別ドメインの場合）**
+    - ブラウザはクロスサイトで Cookie を送信するには `SameSite=None` が必要かつ `Secure` を必須とする。
+    - 推奨: `Set-Cookie: session_id=<token>; HttpOnly; Secure; SameSite=None; Domain=.example.com; Path=/; Max-Age=604800`（サブドメインを跨ぐ場合）。
+    - CORS: API は `Access-Control-Allow-Credentials: true` と `Access-Control-Allow-Origin` を明示的に設定する必要があります。クライアントの `fetch` は `credentials: 'include'` を使います。
+
+- **運用上の推奨:** 可能なら同一最上位ドメインでフロントとAPIを提供する（例: `app.example.com` と `api.example.com` の両方を `.example.com` ドメインで扱う）か、リバースプロキシで単一オリジンに見せると Cookie と CSRF の扱いが簡単になります。
+
 ## 2. バリデーションスキーマ (Zod Schemas)
 
 **配置場所:** `packages/backend/src/validators/`
@@ -122,7 +156,8 @@ export const loginSchema = z.object({
 export const userResponseSchema = z.object({
     id: ulidSchema,
     username: z.string(),
-    createdAt: z.date(),
+    // API uses ISO-8601 datetime strings
+    createdAt: z.string().datetime(),
 });
 ```
 
@@ -168,9 +203,9 @@ export const noteResponseSchema = z.object({
     icon: z.string().nullable(),
     visibility: z.enum(['private', 'public', 'shared']),
     shareToken: z.string().uuid().nullable(),
-    shareExpiresAt: z.date().nullable(), // Date object in response
-    createdAt: z.date(),
-    updatedAt: z.date(),
+    shareExpiresAt: z.string().datetime().nullable(), // ISO-8601 string in responses
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
 });
 
 // メモ一覧レスポンス（ページネーション付き）
@@ -342,6 +377,12 @@ app.post(
 
 Note: Upload はエディタフローに沿って2段階を想定します。`POST /api/upload` は一時的な `assetId` と `tempUrl` を返却し（クライアントはプレースホルダを差し替え）、メモ作成/更新時にサーバ側で `assetId` を `finalize` して `files.noteId` を永続的に紐付けます。孤立ファイルは TTL 後に GC される運用を推奨します。
 
+Operational guidance (uploads):
+
+- Idempotency: `POST /api/upload` should accept an optional `Idempotency-Key` header. When clients retry, the server returns the same `id`/`url` for the same key instead of creating duplicates.
+- Resumable uploads: for large files or flaky networks consider a resumable protocol (TUS or chunked uploads). At minimum document client retry semantics and `Idempotency-Key` behaviour.
+- Orphan GC: recommend `ORPHAN_TTL_DAYS` environment variable (default 7). Provide a daily cleanup job that deletes database metadata and physical files older than `ORPHAN_TTL_DAYS` and with `noteId IS NULL` (see `code-examples.md` for sample SQL).
+
 PATCH `/api/notes/:id` の取り決め:
 
 - ペイロードは部分更新（例: JSON Patch または独自 ops）を受け付ける。編集フローは `contentBlocks` を基本とし、ブロック挿入/削除/置換/並び替えの最低限の操作をサポートすること。
@@ -352,6 +393,12 @@ PATCH `/api/notes/:id` の取り決め:
 - `POST /api/notes/:id/lock` — ロック取得。成功時は `{ lockToken, owner: { id, username }, expiresAt }` を返却する。ロックは短めの TTL（例: 300秒）で自動失効する。クライアントは長時間編集中は定期的にリフレッシュを行う。
 - `DELETE /api/notes/:id/lock` — ロック解除（所有者のみ）。
 - `GET /api/notes/:id/lock` — 現在のロック状態取得。
+
+追加の取り決め:
+
+- `PATCH /api/notes/:id/lock` — ロックのリフレッシュ（TTL 更新）。クライアントは定期的にこのエンドポイントを呼び出してロックを延長できます。成功時は新しい `expiresAt` を返す。
+- `If-Lock` ヘッダ / `lockToken` フィールド: 更新系操作（`PATCH /api/notes/:id` 等）は、取得した `lockToken` を `If-Lock: <lockToken>` ヘッダ、またはリクエストボディの `lockToken` フィールドで送信することを必須とします。サーバはトークン一致を検証し、不一致またはトークン未送信の場合は `409 CONFLICT` を返します。
+- `lockToken` の生成: ランダムで推測不可能なトークン（UUID v4 以上のエントロピーを持つ文字列）を使用し、DB は `note_locks` テーブル（`noteId, lockToken, ownerId, expiresAt, createdAt`）で管理します。リフレッシュは同一トークンで行い、トークン再発行は明示的な再取得（`POST /lock`）時のみ実施します。
 
 ---
 

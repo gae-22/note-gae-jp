@@ -258,6 +258,33 @@ export const sessions = sqliteTable('sessions', {
 });
 ```
 
+### 2.5 note_locks テーブル（排他ロック）
+
+排他ロックを明示的にDBで管理する場合の Drizzle スキーマ例を示します。ロックは短期間で自動失効する設計で、TTL リフレッシュ API と組み合わせます。
+
+```typescript
+export const noteLocks = sqliteTable('note_locks', {
+    id: text('id').primaryKey(), // ULID
+    noteId: text('note_id')
+        .notNull()
+        .references(() => notes.id, { onDelete: 'cascade' }),
+    lockToken: text('lock_token').notNull().unique(),
+    ownerId: text('owner_id')
+        .notNull()
+        .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' })
+        .notNull()
+        .default(sql`(unixepoch())`),
+});
+```
+
+運用メモ:
+
+- `lockToken` は UUID v4 もしくは同等のランダムエントロピーを持つ文字列を使用する。
+- TTL の管理はアプリ側で行い、定期的に期限切れロックを削除するクリーンアップジョブを走らせる（例: 60s 毎のジョブ、または DB 側で削除クエリを走らせる）。
+- `POST /api/notes/:id/lock` は新規ロックを生成し、既にロックが存在する場合は `409 CONFLICT` を返すルールが実装しやすい。
+
 ---
 
 ## 3. リレーション定義 (Relations)
@@ -367,6 +394,35 @@ END;
         sql`SELECT n.* FROM notes n INNER JOIN notes_fts ON n.rowid = notes_fts.rowid WHERE notes_fts MATCH ${query}`,
     );
     ```
+
+重要な移行・運用注意点:
+
+- FTS5 の `content_rowid='rowid'` を利用する場合、`notes` テーブルの暗黙的 `rowid` と FTS の rowid が結びつきます。`VACUUM` や一部の大きなスキーマ変更、`REPLACE INTO` の取り扱いにより `rowid` の振替が発生する可能性があり、FTS とデータ本体の同期に注意が必要です。
+- マイグレーション例（drizzle-generated SQL に加えて手作業で追加する例）:
+
+```sql
+-- migration: create notes_fts virtual table and triggers
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+    title,
+    content,
+    content='notes',
+    content_rowid='rowid',
+    tokenize='trigram'
+);
+
+CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content_markdown);
+END;
+CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid) VALUES ('delete', old.rowid);
+END;
+CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid) VALUES ('delete', old.rowid);
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content_markdown);
+END;
+```
+
+- 既存の大量データに対して FTS を導入する場合は、マイグレーション中に一時的にサービスをクローズするか、バックグラウンドでバッチ同期を行うワークフローを用意してください（FTS の再構築中の検索不整合に注意）。
 
 ---
 

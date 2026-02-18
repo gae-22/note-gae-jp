@@ -232,22 +232,37 @@ export const renderMarkdown = async (markdown: string): Promise<string> => {
 import type { Context, Next } from 'hono';
 
 export const cspMiddleware = async (c: Context, next: Next) => {
-    c.header(
-        'Content-Security-Policy',
-        [
-            "default-src 'self'",
-            "script-src 'self' 'unsafe-inline'", // React では unsafe-inline が必要な場合がある
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: https:",
-            "font-src 'self'",
-            "connect-src 'self'",
-            "media-src 'self'",
-            "object-src 'none'",
-            "frame-src 'none'",
-            "base-uri 'self'",
-            "form-action 'self'",
-        ].join('; '),
-    );
+    // Recommended: use a nonce per-request and include it in script tags rendered by the server.
+    // Note: framework-side template rendering must add the same nonce to <script nonce="..."> tags.
+    const nonce =
+        globalThis.crypto && crypto.getRandomValues
+            ? Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                  .map((b) => b.toString(16).padStart(2, '0'))
+                  .join('')
+            : Date.now().toString(36);
+
+    const csp = [
+        "default-src 'self'",
+        `script-src 'self' 'nonce-${nonce}'`, // prefer nonces over 'unsafe-inline'
+        // Prefer avoiding 'unsafe-inline' for styles. Use one of:
+        // 1) External bundled CSS files (no inline styles)
+        // 2) Nonce-based inline styles: include the same nonce as for scripts on the <style nonce="..."> tag
+        // 3) Hashed inline styles (sha256-...)
+        // In dev you may allow 'unsafe-inline' temporarily, but production must avoid it.
+        `style-src 'self' 'nonce-${nonce}'`,
+        "img-src 'self' data: https:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "media-src 'self'",
+        "object-src 'none'",
+        "frame-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ].join('; ');
+
+    // Expose the nonce to downstream handlers/templates so they can inject <script nonce="..."> or <style nonce="...">
+    c.set('csp-nonce', nonce);
+    c.header('Content-Security-Policy', csp);
 
     await next();
 };
@@ -441,21 +456,32 @@ app.use(
   return c.json({ error: error.message }, 500);
 }
 
-// ✅ 良い例（一般的なメッセージのみ）
+// ✅ 良い例（一般的なメッセージ + エラーID を返す）
 } catch (error) {
-  console.error('Internal error:', error);  // サーバーログに記録
+    // エラー識別子を生成して、構造化ログとエラートラッキングに含める
+    const errorId = ulid();
+    console.error({ errorId, error }); // 構造化ログ
 
-  return c.json(
-    {
-      success: false,
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected error occurred',
-      },
-    },
-    500
-  );
+    // Sentry等に送る場合はここで captureException を呼び、errorId をタグ/extra に含める
+    // captureException(error, { tags: { errorId } })
+
+    return c.json(
+        {
+            success: false,
+            error: {
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'An unexpected error occurred',
+                id: errorId, // ユーザーはこの id をサポートに伝えられる
+            },
+        },
+        500,
+    );
 }
+
+// 環境変数（監視・Sentry）:
+// - SENTRY_DSN: Sentry DSN
+// - SENTRY_ENVIRONMENT: production|staging|development
+// CI/Runbook でこれらの設定を確認し、本番では必ず有効にすることを推奨します。
 ```
 
 ---

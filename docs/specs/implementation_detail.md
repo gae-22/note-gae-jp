@@ -63,6 +63,7 @@
 | `UPLOADS_DIR`      | No         | `uploads/`              | アップロードファイルの保存先                                         |
 | `FRONTEND_URL`     | Yes (本番) | `http://localhost:5173` | CSRF 検証用のフロントエンドオリジン                                  |
 | `LOCK_TTL_SECONDS` | No         | `300`                   | エディタ排他ロックの TTL（秒）。クライアントは定期リフレッシュを行う |
+| `ORPHAN_TTL_DAYS`  | No         | `7`                     | 孤立アップロードファイルの GC 保持日数（デフォルト: 7 日）           |
 
 **セキュアな初期セットアップ:**
 
@@ -118,6 +119,36 @@ jobs:
             - run: pnpm -w lint
 ```
 
+### 6.5 OpenAPI 自動生成（Zod → OpenAPI）
+
+型安全な API ドキュメントのために、Zod スキーマから OpenAPI を自動生成することを推奨します。例として `zod-to-openapi` / `zod-to-json-schema` 経由で `openapi.yaml` を出力するワークフローを CI に追加してください。簡単なスクリプト例:
+
+```json
+// package.json scripts
+"scripts": {
+    "gen:openapi": "node ./scripts/gen-openapi.js"
+}
+```
+
+GitHub Actions スニペット:
+
+```yaml
+- name: Generate OpenAPI
+    run: pnpm gen:openapi
+```
+
+`gen-openapi.js` では `packages/shared` の Zod スキーマを読み、OpenAPI を生成して `docs/openapi.yaml` に出力します。CI で差分をチェックし、必要に応じてアーティファクトとして保存してください。
+
+### 6.6 Resumable / Large File Uploads
+
+大きなファイルや不安定な回線に対しては resumable upload（例: TUS プロトコル）を検討してください。最小実装でも以下を文書化しておくと安定します:
+
+- クライアント側: アップロード中に `Idempotency-Key` を付与し、失敗時はキーを使ってリトライ。
+- サーバ側: 小さなチャンク／Range を受け付けるか、TUS サーバライブラリを導入する（Node では `tus-node-server` 等）。
+- CI/運用: 大容量アップロードは専用の一時領域（別ボリューム）に保存し、完了後に最終保存ディレクトリへ移動するワークフローを推奨。
+
+簡易案: まずは `Idempotency-Key` とチャンクサイズ（例: 5MB）で再試行をサポートし、必要に応じて TUS に移行してください。
+
 ### 6.3 Seed / Dev helper commands
 
 - DB マイグレーション生成: `pnpm --filter backend db:generate`
@@ -132,6 +163,27 @@ jobs:
 
 - **単体・統合:** Vitest
 - **E2E:** Playwright
+
+小さな実装ノート:
+
+- Vitest (サービス層) での DB テスト: テスト時はインメモリ SQLite を使い、`beforeEach` でマイグレーションを適用してクリーンな状態を確保してください。例: `sqlite::memory:` 接続文字列を使用。
+- Playwright: CI では headless モードで実行、`packages/e2e/playwright.config.ts` に `webServer` を定義してテスト前にバックエンドを立ち上げると安定します。
+
+簡易 Playwright 設定例（`packages/e2e/playwright.config.ts`）:
+
+```ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+    testDir: './tests',
+    use: { baseURL: process.env.E2E_BASE_URL || 'http://localhost:5173' },
+    webServer: {
+        command: 'pnpm --filter backend dev',
+        port: 5173,
+        reuseExistingServer: !process.env.CI,
+    },
+});
+```
 
 ### 5.2 テスト範囲
 
