@@ -344,6 +344,44 @@ const response = await apiClient.notes.$get();
 const notes = await response.json();
 ```
 
+### 4.3 型の境界: `packages/shared` と Hono RPC
+
+`packages/shared` と Hono RPC 型生成が混在すると型の二重管理が発生します。明確な境界を決めてください。
+
+- **API 型 (Network DTOs):** Hono RPC が自動生成する型を API 層で唯一の一次ソースとします。フロントエンドの API 呼び出し箇所では Hono RPC の型を利用してください。
+
+- **`packages/shared` の責務:** UI の表示用ドメイン型、コンポーネントの Props、`toApi` / `fromApi` 変換関数、日付変換や小さなユーティリティを置きます。`packages/shared` はネットワークの契約そのものを上書きしてはいけません。
+
+- **変換パターン:** API とドメインの間で明示的に変換するユーティリティを必ず用意してください。
+
+```typescript
+// packages/shared/transforms.ts
+export type ApiNote = {
+    id: string;
+    createdAt: string;
+    updatedAt: string; /* ... */
+};
+export type Note = { id: string; createdAt: Date; updatedAt: Date /* ... */ };
+
+export const fromApi = (a: ApiNote): Note => ({
+    ...a,
+    createdAt: new Date(a.createdAt),
+    updatedAt: new Date(a.updatedAt),
+});
+
+export const toApi = (d: Note): ApiNote => ({
+    ...d,
+    createdAt: d.createdAt.toISOString(),
+    updatedAt: d.updatedAt.toISOString(),
+});
+```
+
+- **推奨ルール:**
+    1. Hono RPC を API 型の一次ソースとする
+    2. `packages/shared` はドメイン型・変換・UI ユーティリティに限定する
+
+CI に `pnpm build:shared` や型チェックを入れて同期不整合を検出することを推奨します。
+
 ---
 
 ### 4.2 型安全性

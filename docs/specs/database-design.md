@@ -433,6 +433,52 @@ END;
 - **スナップショット:** `data/data.db` のファイルコピーを周期的に外部ストレージへ転送する。推奨: 毎日深夜、過去7世代を保持。
 - **整合性検査:** バックアップ前に `PRAGMA integrity_check;` を実行し、問題があれば通知する。
 
+### 7.1.1 WAL モード時の安全なバックアップ手順 (推奨)
+
+SQLite を WAL モードで運用している場合、単に `data.db` をコピーするだけでは一貫性のあるスナップショットが得られない可能性があります。以下の手順を推奨します。
+
+- 推奨: `sqlite3` CLI の `.backup` コマンドを使用する（オンラインでも整合性の取れたバックアップが可能）。例:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+TIMESTAMP=$(date -u +"%Y%m%dT%H%M%SZ")
+BACKUP_DIR=/var/backups/note-gae-jp
+mkdir -p "$BACKUP_DIR"
+sqlite3 data/data.db ".backup '$BACKUP_DIR/data-$TIMESTAMP.db'"
+```
+
+- あるいは SQLite 3.27+ が利用可能なら `VACUUM INTO` を使って整合性のあるコピーを作成できます（この操作はデータベースに排他ロックを要求します）。例:
+
+```bash
+sqlite3 data/data.db "VACUUM INTO 'backups/data-$(date -u +%Y%m%dT%H%M%SZ).db';"
+```
+
+- どちらの方法でも、バックアップ後に `PRAGMA integrity_check;` を実行して検証することを習慣にしてください。
+
+### 7.1.2 バックアップ復元手順
+
+復元ではデータ整合性を保つために以下を行います。
+
+1. アプリケーション（backend プロセス）を停止します。稼働中にデータファイルを置き換えると WAL 状態が不整合になります。
+2. ターゲットのバックアップファイルを `data/data.db` に上書き（安全のため古いファイルは別名で退避）。
+
+```bash
+# 停止済みであることを確認した上で
+cp /var/backups/note-gae-jp/data-20260219T000000Z.db data/data.db
+chown <appuser>:<appgroup> data/data.db
+```
+
+3. 権限を確認し、`PRAGMA integrity_check;` を sqlite3 で実行して整合性を確認します。
+
+```bash
+sqlite3 data/data.db "PRAGMA integrity_check;"
+```
+
+4. アプリケーションを起動し、ログを監視してエラーがないか確認します。
+
+**注意:** WAL モードの `.db-wal` / `.db-shm` ファイルは運用中にのみ正しく存在します。バックアップ/復元作業では上記の `.backup` / `VACUUM INTO` を利用し、直接 `.db-wal` をコピー・編集しないでください。
+
 ### 7.2 VACUUM と最適化
 
 - データ量の増減後に `VACUUM;` を実行してファイルサイズを最適化する。大きな VACUUM はメンテナンス時間帯に行う。

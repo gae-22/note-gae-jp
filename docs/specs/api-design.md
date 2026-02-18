@@ -46,11 +46,64 @@
 {
     "success": false,
     "error": {
-        "code": "BAD_REQUEST", // エラーコード (String)
-        "message": "Invalid input data" // 開発者向けメッセージ (User UI表示用ではない)
+        "code": "BAD_REQUEST",
+        "message": "Invalid input data",
+        "details": [
+            {
+                "field": "title",
+                "issue": "too_long",
+                "message": "Title must be 200 characters or less"
+            }
+        ]
     }
 }
 ```
+
+> Note: `details` は任意で、フィールド単位のバリデーション情報を配列で返します。各要素は少なくとも `field` と `issue` を持ち、運用上 `message` を追加して人間向け説明を付けても良いです。
+
+##### Validation Error Details (Zod → API 変換)
+
+バックエンドは Zod のバリデーションエラーを受け取った際に、上記の `details` 形式に変換して返すミドルウェアを実装してください。例:
+
+```typescript
+// middleware/validation-handler.ts
+import { ZodError } from 'zod';
+
+export const mapZodErrorToApi = (err: ZodError) => {
+    const flattened = err.flatten();
+    const details = Object.entries(flattened.fieldErrors).flatMap(
+        ([field, messages]) =>
+            (messages || []).map((m) => ({
+                field,
+                issue: 'validation_failed',
+                message: m,
+            })),
+    );
+
+    return {
+        success: false,
+        error: {
+            code: 'BAD_REQUEST',
+            message: 'Validation failed',
+            details,
+        },
+    };
+};
+
+// Hono の例
+app.use(async (c, next) => {
+    try {
+        await next();
+    } catch (err) {
+        if (err instanceof ZodError) {
+            return c.json(mapZodErrorToApi(err), 400);
+        }
+        throw err;
+    }
+});
+```
+
+フロントエンド側では `details` の `field` をキーにして React Hook Form の `setError(field, { message })` にマッピングすることで、該当入力項目にバリデーションメッセージを表示できます。
 
 ### 1.3 エラーコード定義 (Strict Mapping)
 
