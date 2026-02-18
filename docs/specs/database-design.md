@@ -1,7 +1,14 @@
 # データベース設計書 (Database Design Specification)
 
-本ドキュメントは、`note-gae-jp` プロジェクトにおけるデータベース設計を**厳密に**定義する。
-開発者は本仕様書に完全に準拠し、勝手な解釈による実装を行ってはならない。
+概要: テーブルスキーマ、インデックス、リレーション、およびマイグレーション手順を定義します。データ整合性と運用性（バックアップ・VACUUM等）に重点を置いています。
+
+推奨読者: DB設計者、バックエンド実装者、運用担当。
+
+重要ポイント:
+
+- ULID をアプリ側で生成し、DBはそれを主キーとして扱う設計。
+- 時刻は UTC の Unix Timestamp を使用、NOT NULL ルールを厳格に適用。
+- FTS5 を用いた全文検索の実装方針と同期トリガー例を含む。
 
 ## 1. データベース概要
 
@@ -92,11 +99,17 @@ export const notes = sqliteTable(
         title: text('title').notNull(),
 
         /**
-         * 本文 (Markdown)
-         * - 空文字許容
-         * - 最大長: SQLite限界まで（実質無制限）
+         * 本文（Blocks JSON: canonical）
+         * - ブロック単位の配列を JSON 文字列で格納する
+         * - 例: [{id,type,content,props}, ...]
          */
-        content: text('content').notNull().default(''),
+        contentBlocks: text('content_blocks').notNull().default('[]'),
+
+        /**
+         * 互換用 Markdown（任意）
+         * - サーバ側で blocks から生成する場合に格納
+         */
+        contentMarkdown: text('content_markdown'),
 
         /**
          * カバー画像 URL
@@ -333,14 +346,15 @@ CREATE VIRTUAL TABLE notes_fts USING fts5(
 -- トリガー (Notesテーブルとの同期)
 -- new.rowid / old.rowid は notes の暗黙的 integer rowid
 CREATE TRIGGER notes_ai AFTER INSERT ON notes BEGIN
-  INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content);
+    -- content は notes.content_markdown を用いて FTS 用テキスト列に格納する
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content_markdown);
 END;
 CREATE TRIGGER notes_ad AFTER DELETE ON notes BEGIN
   INSERT INTO notes_fts(notes_fts, rowid) VALUES ('delete', old.rowid);
 END;
 CREATE TRIGGER notes_au AFTER UPDATE ON notes BEGIN
   INSERT INTO notes_fts(notes_fts, rowid) VALUES ('delete', old.rowid);
-  INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content);
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content_markdown);
 END;
 ```
 
@@ -353,3 +367,27 @@ END;
         sql`SELECT n.* FROM notes n INNER JOIN notes_fts ON n.rowid = notes_fts.rowid WHERE notes_fts MATCH ${query}`,
     );
     ```
+
+---
+
+## 7. Backup, Maintenance and Migration Examples
+
+### 7.1 バックアップ方針
+
+- **スナップショット:** `data/data.db` のファイルコピーを周期的に外部ストレージへ転送する。推奨: 毎日深夜、過去7世代を保持。
+- **整合性検査:** バックアップ前に `PRAGMA integrity_check;` を実行し、問題があれば通知する。
+
+### 7.2 VACUUM と最適化
+
+- データ量の増減後に `VACUUM;` を実行してファイルサイズを最適化する。大きな VACUUM はメンテナンス時間帯に行う。
+
+### 7.3 マイグレーションの例（SQL）
+
+```sql
+-- 例: notes テーブルにカラムを追加するマイグレーション
+BEGIN TRANSACTION;
+ALTER TABLE notes ADD COLUMN summary TEXT DEFAULT '';
+COMMIT;
+```
+
+Drizzle Kit を用いる場合は自動生成された SQL をレビューしてから適用する運用を推奨する。

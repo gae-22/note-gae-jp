@@ -1,7 +1,14 @@
 # API設計書 (API Design Specification)
 
-本ドキュメントは、`note-gae-jp` の API 仕様およびバックエンドのビジネスロジックを**厳密に**定義する。
-Hono (RPC Mode) を採用し、フロントエンド・バックエンド間で型安全な通信を実現する。
+概要: 本書は `note-gae-jp` の API 仕様と実装指針を一元化したリファレンスです。エンドポイント定義、共通レスポンス、バリデーション、サービスロジックなどを明確に示しています。
+
+推奨読者: バックエンド実装者・フロントエンド開発者・APIレビュー担当者。
+
+重要ポイント:
+
+- 型安全な契約: Hono RPC + Zod によるスキーマ共有を前提としています。
+- 一貫したエラーフォーマットと権限チェックを厳格に適用します。
+- ファイルアップロード等の境界ケースも具体的に扱います。
 
 ---
 
@@ -85,6 +92,23 @@ export const paginationSchema = z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
 });
+
+// Block schema (canonical content model: Blocks JSON)
+export const blockSchema = z.object({
+    id: z.string().min(1),
+    type: z.enum([
+        'paragraph',
+        'heading',
+        'code',
+        'image',
+        'embed',
+        'list',
+        'quote',
+    ]),
+    // content may be string or structured object depending on block type
+    content: z.any(),
+    props: z.record(z.any()).optional(),
+});
 ```
 
 ### 2.2 認証関連 (`auth.ts`)
@@ -111,7 +135,10 @@ export const shareDurationSchema = z.enum(['1d', '7d', '30d', 'unlimited']);
 // メモ作成
 export const createNoteSchema = z.object({
     title: z.string().min(1, 'Title is required').max(200),
-    content: z.string().default(''), // Markdown content
+    // Canonical content: blocks JSON
+    contentBlocks: z.array(blockSchema).default([]),
+    // Optional derived/legacy Markdown string (server may populate from blocks)
+    contentMarkdown: z.string().optional().nullable(),
     coverImage: z.string().url().max(1000).optional().nullable(),
     icon: z.string().max(10).optional().nullable(), // Emoji or short text
     visibility: z.enum(['private', 'public', 'shared']).default('private'),
@@ -133,7 +160,10 @@ export const listNotesQuerySchema = paginationSchema.extend({
 export const noteResponseSchema = z.object({
     id: ulidSchema,
     title: z.string(),
-    content: z.string(),
+    // Blocks JSON canonical representation
+    contentBlocks: z.array(blockSchema),
+    // Optional derived Markdown for compatibility
+    contentMarkdown: z.string().nullable(),
     coverImage: z.string().nullable(),
     icon: z.string().nullable(),
     visibility: z.enum(['private', 'public', 'shared']),
@@ -246,18 +276,21 @@ export const uploadResponseSchema = z.object({
 
 ### 4.1 エンドポイント一覧
 
-| Method   | Path                 | Auth | Service           | Description                                   |
-| :------- | :------------------- | :--- | :---------------- | :-------------------------------------------- |
-| `POST`   | `/api/auth/login`    | -    | `Auth.login`      | ログイン                                      |
-| `POST`   | `/api/auth/logout`   | User | `Auth.logout`     | ログアウト (Cookie削除)                       |
-| `GET`    | `/api/auth/me`       | -    | `Auth.me`         | 現在のユーザー情報を取得 (未ログインならnull) |
-| `GET`    | `/api/notes`         | Opt  | `Note.list`       | メモ一覧取得                                  |
-| `POST`   | `/api/notes`         | User | `Note.create`     | メモ作成                                      |
-| `GET`    | `/api/notes/:id`     | Opt  | `Note.get`        | メモ詳細取得                                  |
-| `PATCH`  | `/api/notes/:id`     | User | `Note.update`     | メモ更新                                      |
-| `DELETE` | `/api/notes/:id`     | User | `Note.delete`     | メモ削除                                      |
-| `GET`    | `/api/shared/:token` | -    | `Note.getByToken` | 共有メモ取得                                  |
-| `POST`   | `/api/upload`        | User | `File.upload`     | ファイルアップロード (Multipart)              |
+| Method   | Path                  | Auth | Service           | Description                                      |
+| :------- | :-------------------- | :--- | :---------------- | :----------------------------------------------- |
+| `POST`   | `/api/auth/login`     | -    | `Auth.login`      | ログイン                                         |
+| `POST`   | `/api/auth/logout`    | User | `Auth.logout`     | ログアウト (Cookie削除)                          |
+| `GET`    | `/api/auth/me`        | -    | `Auth.me`         | 現在のユーザー情報を取得 (未ログインならnull)    |
+| `GET`    | `/api/notes`          | Opt  | `Note.list`       | メモ一覧取得                                     |
+| `POST`   | `/api/notes`          | User | `Note.create`     | メモ作成                                         |
+| `GET`    | `/api/notes/:id`      | Opt  | `Note.get`        | メモ詳細取得                                     |
+| `PATCH`  | `/api/notes/:id`      | User | `Note.update`     | メモ更新                                         |
+| `DELETE` | `/api/notes/:id`      | User | `Note.delete`     | メモ削除                                         |
+| `POST`   | `/api/notes/:id/lock` | User | `Note.lock`       | メモ編集中の排他ロックを取得 (lock token を返す) |
+| `DELETE` | `/api/notes/:id/lock` | User | `Note.unlock`     | ロック解除 (作業完了時)                          |
+| `GET`    | `/api/notes/:id/lock` | Opt  | `Note.lockStatus` | 指定メモのロック状況を取得                       |
+| `GET`    | `/api/shared/:token`  | -    | `Note.getByToken` | 共有メモ取得                                     |
+| `POST`   | `/api/upload`         | User | `File.upload`     | ファイルアップロード (Multipart)                 |
 
 ### 4.2 Hono 実装例 (Upload)
 
@@ -306,6 +339,78 @@ app.post(
     },
 );
 ```
+
+Note: Upload はエディタフローに沿って2段階を想定します。`POST /api/upload` は一時的な `assetId` と `tempUrl` を返却し（クライアントはプレースホルダを差し替え）、メモ作成/更新時にサーバ側で `assetId` を `finalize` して `files.noteId` を永続的に紐付けます。孤立ファイルは TTL 後に GC される運用を推奨します。
+
+PATCH `/api/notes/:id` の取り決め:
+
+- ペイロードは部分更新（例: JSON Patch または独自 ops）を受け付ける。編集フローは `contentBlocks` を基本とし、ブロック挿入/削除/置換/並び替えの最低限の操作をサポートすること。
+- 更新はロック制御と組み合わせて行う。クライアントはロック取得時に得た `Lock-Token` を `If-Lock` ヘッダまたは `lockToken` フィールドで送信すること。ロックのない更新は `409 CONFLICT` を返すことがある。
+
+排他ロック API:
+
+- `POST /api/notes/:id/lock` — ロック取得。成功時は `{ lockToken, owner: { id, username }, expiresAt }` を返却する。ロックは短めの TTL（例: 300秒）で自動失効する。クライアントは長時間編集中は定期的にリフレッシュを行う。
+- `DELETE /api/notes/:id/lock` — ロック解除（所有者のみ）。
+- `GET /api/notes/:id/lock` — 現在のロック状態取得。
+
+---
+
+## 6. OpenAPI スニペットと cURL 例
+
+本節では代表的な API の OpenAPI 互換スニペットと簡易的な cURL 実行例を示す。実運用では `openapi.yaml` を自動生成することを推奨する。
+
+### 6.1 Login (cURL)
+
+```bash
+curl -v -X POST 'https://example.com/api/auth/login' \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"secret"}' -c cookies.txt
+```
+
+### 6.2 Create Note (cURL, uses cookie auth saved above)
+
+```bash
+curl -v -X POST 'https://example.com/api/notes' \
+    -H 'Content-Type: application/json' \
+    -b cookies.txt \
+    -d '{"title":"Hello","contentBlocks":[{"id":"b1","type":"heading","content":"Hi"},{"id":"b2","type":"paragraph","content":"Welcome"}],"visibility":"private"}'
+```
+
+### 6.3 OpenAPI Minimal Snippet (YAML)
+
+```yaml
+openapi: 3.0.3
+info:
+    title: note-gae-jp API
+    version: '1.0'
+paths:
+    /api/auth/login:
+        post:
+            summary: Login
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                username:
+                                    type: string
+                                password:
+                                    type: string
+            responses:
+                '200':
+                    description: success
+                '401':
+                    description: unauthorized
+```
+
+---
+
+## 7. Idempotency & Retry Guidance
+
+- `POST /api/upload`: 非同期処理やネットワーク再試行に備え、クライアント側でアップロード完了確認（返却された `id` と `url`）を検証すること。
+- 冪等性が必要な操作（外部決済連携等）は `Idempotency-Key` ヘッダを設ける。現在の機能群では必須ではないが、将来の拡張を見越して設計に組み込める。
 
 ---
 

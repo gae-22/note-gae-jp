@@ -1,8 +1,14 @@
 # セキュリティ設計書
 
-## 1. セキュリティ概要
+概要: OWASP に基づく脅威モデルと対策をまとめたドキュメントです。認証・セッション管理・CSRF/XSS対策、ファイルアップロードの安全化、ログ・監査、運用保守（ローテーション・バックアップ）を扱います。
 
-本システムのセキュリティ設計は、**OWASP Top 10** および **OWASP API Security Top 10** に基づき、以下の脅威に対する対策を実装する。
+推奨読者: セキュリティ担当、バックエンド実装者、運用担当。
+
+重要ポイント:
+
+- パスワードは Argon2id、セッションは HttpOnly Cookie、SameSite=Lax を採用。
+- 入力は Zod で厳格にバリデートし、DB は Drizzle を通じて操作する。生SQLは限定的に。
+- 本番ではエラーメッセージの露出を抑え、ログは構造化して外部で集約すること。
 
 ### 1.1 対象とする脅威
 
@@ -733,3 +739,26 @@ pnpm audit --fix
 - [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/)
 - [MDN Web Security](https://developer.mozilla.org/en-US/docs/Web/Security)
 - [Content Security Policy Reference](https://content-security-policy.com/)
+
+---
+
+## 14. Secrets Management, SAST, Logging & Rotation
+
+### 14.1 Secrets Management and Rotation
+
+- **Secret Store:** 本番では環境変数を直接置くのではなく、Vault / Secrets Manager（例: AWS Secrets Manager, HashiCorp Vault）を推奨する。
+- **ローテーション:** `SESSION_SECRET` などの長期シークレットは定期ローテーション（例: 90日）をポリシーとして運用する。ローテーション時は段階的な切替を採る（旧シークレットの受け入れ窓を設けるなど）。
+
+### 14.2 SAST / Dependency Scanning
+
+- CI に `pnpm audit` と OSS 依存性スキャン（Dependabot / Snyk 等）を組み込み、脆弱性検出時はアラートを出す。重大な脆弱性はリリースブロックとする。
+- 静的解析（TypeScript + Biome）を CI で必須とし、コード品質ゲートを設定する。
+
+### 14.3 Logging Retention & Privacy
+
+- **Retention:** エラーログとアクセスログは運用ポリシーに応じて保持期間を定める（例: エラーログ 90日、アクセスログ 30日）。
+- **個人情報:** ログにはパスワード等の機密情報を出力しない。IPや個人識別子を保存する場合はプライバシーポリシーに則る。
+
+### 14.4 Incident Response
+
+- インシデント発生時は事前定義した Runbook に従う。重要な手順: 被害範囲の特定、影響範囲の封じ込め、復旧、ポストモーテム。

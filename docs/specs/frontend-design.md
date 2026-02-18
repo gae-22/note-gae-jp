@@ -1,7 +1,14 @@
 # フロントエンド設計書 (Frontend Design Specification)
 
-本ドキュメントは、`note-gae-jp` のフロントエンド実装を**厳密に**定義する。
-UI/UX は Notion をベンチマークとし、直感的で美しい操作性を実現する。
+概要: フロントエンドのアーキテクチャ、ディレクトリ構成、主要コンポーネント、UX指針、および型定義とフックの設計仕様をまとめた実装ガイドです。
+
+推奨読者: フロントエンド開発者、デザイナー、フロントエンドレビュワー。
+
+重要ポイント:
+
+- 型は共有スキーマ（`packages/shared`）から再利用し、API との整合性を保つ。
+- Tiptap をコアとしたエディタ設計、画像アップロードは `useUpload` フック経由で実装。
+- Accessibility とレスポンシブを初期実装から考慮する。
 
 ---
 
@@ -69,7 +76,15 @@ export interface User {
 export interface Note {
     id: string; // ULID
     title: string;
-    content: string; // Markdown
+    // Canonical: blocks JSON
+    contentBlocks: Array<{
+        id: string;
+        type: string;
+        content: any;
+        props?: Record<string, any>;
+    }>;
+    // Optional derived Markdown
+    contentMarkdown?: string | null;
     coverImage: string | null;
     icon: string | null;
     visibility: 'private' | 'public' | 'shared';
@@ -171,7 +186,7 @@ Notionライクな操作感を実現するための設定。
         - `tiptap-extension-slash-menu` などのライブラリ、または `Suggestion` API を用いて自作。
 - **画像アップロード:**
     - エディタへのドラッグ＆ドロップ時に `handleDrop` イベントをフック。
-    - `POST /api/upload` を実行し、返却されたURLを `editor.chain().focus().setImage({ src: url }).run()` で挿入。
+    - `POST /api/upload` を実行し、一時的な `assetId` / `tempUrl` を受け取る。クライアントはプレースホルダを差し込み、メモ保存時に `assetId` を最終確定 (finalize) するワークフローを推奨する。完成時は `editor.chain().focus().setImage({ src: finalUrl }).run()` で差し替える。
 
 ### 4.2 NoteLayout (Header)
 
@@ -267,3 +282,108 @@ Notionライクな操作感を実現するための設定。
 - **Behavior:**
     - ファイルアップロードAPIを叩き、URLを返す。
     - エディタやカバー画像変更で使用。
+
+---
+
+## 8. Accessibility, i18n, Mobile & Keyboard
+
+### 8.1 Accessibility (A11Y)
+
+- WCAG 2.1 AA を目標とする。
+- 重要要件: キーボード操作可能、フォーカス順の明示、色に頼らない情報提示、適切な aria 属性の付与。
+- 画像には必ず `alt` を付与。カスタムコンポーネントはアクセシブルなロールをサポートする。
+
+### 8.2 Internationalization (i18n)
+
+- 将来的な多言語対応を想定し、UI 文言は `i18n` レイヤーで管理する（例: `react-intl` / `@formatjs`）。
+- 日付/時刻はローカル表示だが内部は UTC を利用する。
+
+### 8.3 Mobile / Responsive
+
+- レスポンシブ設計: モバイルファーストを基本にブレークポイントを定義。サイドバーはモバイル時に折りたたむ。
+- タップ領域は推奨サイズを満たす（44x44px 以上）。
+
+### 8.4 Keyboard Shortcuts
+
+- エディタ操作や保存ショートカットを提供する（例: `Mod+S` で保存、`Mod+B` 太字）。ショートカットは設定で無効化可能にする。
+
+---
+
+## 9. Modern UI/UX (GAE-JP Reference)
+
+目的: 参照サイト（https://github.com/gae-22/www-gae-jp, https://www.gae-jp.net）のモダンでクリーンなビジュアルを踏襲し、`note-gae-jp` の UI を洗練させる。以下は実装指針と具体的トークン、コンポーネント仕様で、フロントエンド実装チームがそのまま使えるレベルで記載する。
+
+### 9.1 デザイン原則
+
+- **Clarity:** 余白とタイポグラフィで情報の優先順位を明確にする。
+- **Calm Contrast:** 強すぎないコントラスト、柔らかいアクセントカラーを使用し長時間の閲覧に耐える配色とする。
+- **Subtle Motion:** アニメーションは状態変化を助ける程度に留める（フェード、スケール、slide）。
+- **Component-first:** `shadcn/ui` と `Tailwind` をベースにアクセシブルな再利用コンポーネントを作る。
+
+### 9.2 デザイントークン（Tailwind 拡張例）
+
+Tailwind の `theme.extend` に次を追加することを推奨する。
+
+- Colors (例):
+    - `primary`: #0f766e (teal-700)
+    - `accent`: #7c3aed (violet-600)
+    - `muted`: #6b7280 (gray-500)
+    - `bg`: #0f172a (dark) / #ffffff (light)
+    - `surface`: #0b1220 (card background dark) / #f8fafc (light)
+    - `border`: rgba(15,23,42,0.06)
+
+- Typography:
+    - `fontFamily`: ['Inter', 'ui-sans-serif', 'system-ui']
+    - base: 16px, scale: 1rem (base), h1..h4: 2rem, 1.5rem, 1.25rem, 1rem
+
+- Spacing / Radius / Shadows:
+    - `spacing` scale 0.25rem steps (xs..xl)
+    - `radius`: sm=6px, md=10px, lg=14px
+    - `shadow`: small subtle card shadow and larger elevated shadow
+
+例: `tailwind.config.cjs` への追加サンプルは Implementation に記載。
+
+### 9.3 主要コンポーネント仕様
+
+- `Header`: ロゴ左、メインナビ、検索、アカウントメニュー（右）。最小高さ: 56px。スクロールでシャドウが現れる。
+
+- `Hero / Landing`: シンプルなキャッチ、サブテキスト、コールトゥアクション（Primary）、画像は背景グラデーションでアクセント。
+
+- `NoteCard` (一覧):
+    - カードに `title`, `excerpt`, `meta` (updatedAt, visibility) を表示。
+    - Hover: 軽い上昇とシャドウ増し、右上にアクション（編集・メニュー）。
+    - レイアウト: grid (col 1..3) responsive
+
+- `Editor`:
+    - フル幅のエディタ領域、左右の余白を確保。
+    - ツールバーは `sticky` にしてスクロールで常時アクセス可能。
+    - 画像プレビューはモーダルで拡大、クリックでダウンロード。
+
+- `ShareDialog`:
+    - 共有リンクを大きく表示、コピーボタン、期限表示、無効化ボタン。
+    - 成功/エラーは `toast` でフィードバック。
+
+- `FileUpload` (ドラッグ&ドロップ):
+    - ドロップ領域は dashed ボーダー、アイコン、プログレスバーを表示。
+
+### 9.4 Microcopy & UX flows
+
+- ボタン文言は短く具体的に: `Save` → `Save draft`, `Publish` → `Publish note`。
+- 重要な破壊操作（Delete）には確認ダイアログと不可逆性の警告を必須にする。
+
+### 9.5 Accessibility & Responsiveness（補足）
+
+- 各コンポーネントはキーボードフォーカスが明確に見えること。
+- カラーコントラストは WCAG AA を満たすように確認。
+
+### 9.6 Implementation checklist
+
+1. `tailwind.config.cjs` に上記トークンを追加
+2. ルートの `packages/frontend/src/design/tokens.ts` を作成し TypeScript トークンをエクスポート
+3. `shadcn/ui` を導入し、`NoteCard`, `Header`, `EditorToolbar`, `ShareDialog` のコンポーネントを実装
+4. ライブラリ: `@headlessui/react` / `radix-ui` の一部コンポーネントを利用
+5. アニメーション: `framer-motion`（軽量使用）でページ間のトランジション・モーダルの出入りを実装
+
+---
+
+参考: 参照元の `www-gae-jp` はシンプルで落ち着いた色調・広い余白が特徴です。視覚的な基準を合わせるため、配色やフォント、カード間隔を近づけてください。

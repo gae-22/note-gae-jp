@@ -1,5 +1,15 @@
 # アーキテクチャ設計書
 
+概要: システム全体の構成、レイヤー分離、運用・デプロイ方針を示す設計書です。設計上の重要決定とその理由を明記し、実装チームが一貫して構築できるようにしています。
+
+推奨読者: アーキテクト、バックエンド・インフラ担当、リード開発者。
+
+重要ポイント:
+
+- モノリシックな可搬性: SQLite + ローカルストレージでまずは簡潔に運用。
+- 将来的移行パス（Postgres/S3/Redis）を明確化。
+- デプロイ手順とマイグレーション運用方針を明示。
+
 ## 1. プロジェクト概要
 
 ### 1.1 プロダクト名
@@ -111,7 +121,7 @@ NotionライクなMarkdownベースの個人用メモ帳アプリケーション
 | カテゴリ         | 技術                | バージョン  | 用途               |
 | ---------------- | ------------------- | ----------- | ------------------ |
 | Package Manager  | pnpm                | latest      | 高速な依存関係管理 |
-| Runtime          | Node.js             | LTS (v22.x) | サーバー実行環境   |
+| Runtime          | Node.js             | LTS (v24.x) | サーバー実行環境   |
 | Language         | TypeScript          | 5.x         | 型安全なコード記述 |
 | Build Tool       | Vite                | 6.x         | 高速ビルド・HMR    |
 | Linter/Formatter | Biome               | latest      | コード品質・整形   |
@@ -158,55 +168,76 @@ NotionライクなMarkdownベースの個人用メモ帳アプリケーション
 
 ---
 
-## 4. プロジェクト構成
+### 4. プロジェクト構成
 
-### 4.1 Monorepo構成（推奨）
+### 4.1 推奨ディレクトリ構成 (理由と選択肢)
+
+このプロジェクトは「可搬性」と「単純なデプロイ」を重視する個人用アプリケーションですが、将来の拡張（分離されたフロント/バックエンド、複数パッケージ、共有型）を見越して**Monorepo (packages/)** 構成を推奨します。以下に2つの現実的な選択肢（Monorepo と シンプルリポジトリ）を示し、利点と運用時の注意点を説明します。
+
+Option A — Monorepo (推奨)
 
 ```
 note-gae-jp/
 ├── packages/
-│   ├── frontend/              # React SPA
+│   ├── frontend/              # React SPA (Vite)
 │   │   ├── src/
 │   │   ├── package.json
-│   │   ├── vite.config.ts
-│   │   └── tsconfig.json
+│   │   └── vite.config.ts
 │   │
 │   ├── backend/               # Hono API Server
 │   │   ├── src/
 │   │   ├── package.json
 │   │   └── tsconfig.json
 │   │
-│   └── shared/                # 共有型定義・スキーマ
+│   └── shared/                # 共有型定義・スキーマ (Zod / types)
 │       ├── src/
-│       │   ├── schemas/       # Zod Schemas
-│       │   └── types/         # TypeScript Types
-│       ├── package.json
-│       └── tsconfig.json
+│       └── package.json
 │
 ├── docs/                      # 設計書・ドキュメント
-│   └── specs/
-│       ├── architecture.md    # このファイル
-│       ├── spec.md            # プロジェクト概要・要件
-│       ├── database-design.md
-│       ├── api-design.md
-│       ├── frontend-design.md
-│       ├── security.md
-│       ├── development-guidelines.md
-│       └── implementation_detail.md
-│
-├── data/                      # SQLiteデータベース
-│   └── data.db
-│
+├── data/                      # SQLite データベース (data.db)
 ├── uploads/                   # アップロードファイル
-│
-├── pnpm-workspace.yaml
-├── package.json
-├── .eslintrc.cjs
-├── .prettierrc
+├── pnpm-workspace.yaml        # workspace 管理
+├── package.json               # 全体スクリプト / dev convenience
 └── README.md
 ```
 
-### 4.2 フロントエンド ディレクトリ構成
+利点:
+
+- 共有型 (`shared`) により `Zod` スキーマや Type 定義をフロント/バックで再利用でき、型安全性が向上します。
+- 個別パッケージの分離により開発・ビルド・テストを独立して実行可能です (`pnpm --filter backend dev`)。
+- CI/CD でパッケージ単位に処理を分割できるためビルド時間を短縮できます。
+
+注意点:
+
+- ルートの `package.json` と `pnpm-workspace.yaml` を正しく設定し、ルートスクリプトで便利コマンドを提供すること。
+- データ (`data/`) と `uploads/` はリポジトリの外部（ボリュームやクラウドストレージ）にマウントする運用が望ましい。
+
+Option B — シンプルリポジトリ (単一サービス)
+
+```
+note-gae-jp/
+├── src/                       # 単一パッケージ構成 (monolith)
+│   ├── backend/
+│   └── frontend/
+├── docs/
+├── data/
+├── uploads/
+├── package.json
+└── README.md
+```
+
+利点:
+
+- 小規模なプロジェクトだと単純で扱いやすく、セットアップコストが低い。
+
+欠点:
+
+- フロントとバックが強く結合し、将来的に共有コードを切り出す手間が増える。
+
+選定ガイドライン:
+
+- 既にフロント・バックを分離して開発したい、または型共有 (`shared`) を使う予定があるなら Monorepo を選んでください。
+- デプロイ先が単一実行ファイルで問題ない（小規模、すぐに始めたい）場合はシンプル構成でも十分です。
 
 ```
 packages/frontend/src/
@@ -575,3 +606,24 @@ NODE_ENV=production pm2 start packages/backend/dist/index.js
 - [TanStack Query Documentation](https://tanstack.com/query/latest)
 - [Tailwind CSS Documentation](https://tailwindcss.com/)
 - [Tiptap Documentation](https://tiptap.dev/)
+
+---
+
+## 10. Observability, Health & Maintenance
+
+### 10.1 Observability
+
+- **Metrics:** アプリケーションは Prometheus 互換のメトリクスをエクスポート可能にする（例: `/metrics`）。収集対象: HTTP レイテンシ（p50/p95/p99）、エラーレート、GC、メモリ/CPU 使用率、DB クエリレイテンシ。
+- **Tracing:** 必要に応じて OpenTelemetry を導入し、重要なリクエストの分散トレーシングを行う。
+- **Logging:** 構造化ログ（JSON）を出力し、レベルは `debug`/`info`/`warn`/`error` を使用。Sentry は例外監視用に導入する。
+
+### 10.2 Health Checks
+
+- **Liveness:** `/healthz` — プロセス生存確認（単純応答）。
+- **Readiness:** `/readyz` — DB 接続・ストレージへの書き込み検証を含む（デプロイ時のトラフィック切り替えに利用）。
+
+### 10.3 Backups & Maintenance
+
+- **SQLite バックアップ:** 定期的に `data/data.db` のファイルコピーを取り、外部ストレージ（S3/外部ボリューム）へ保存するスケジュールを設定（例: 毎日深夜、7世代保持）。
+- **Integrity Check:** バックアップ取得時に `PRAGMA integrity_check;` を実行し、障害検出を自動化する。
+- **Vacuum:** 定期的に `VACUUM` を実行してファイルサイズを最適化する（低負荷時間帯に実行）。
