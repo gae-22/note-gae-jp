@@ -93,9 +93,29 @@ app.delete('/:id/lock', async (c) => {
 });
 
 /**
- * PUT /api/notes/:id/lock — Renew lock
+ * GET /api/notes/:id/lock — Get lock status
  */
-app.put('/:id/lock', zValidator('json', renewLockSchema), async (c) => {
+app.get('/:id/lock', async (c) => {
+    const noteId = c.req.param('id');
+
+    const lock = await LockService.getStatus(noteId);
+
+    return c.json({
+        success: true,
+        data: lock
+            ? {
+                  ...lock,
+                  expiresAt: lock.expiresAt.toISOString(),
+                  createdAt: lock.createdAt.toISOString(),
+              }
+            : null,
+    });
+});
+
+/**
+ * PATCH /api/notes/:id/lock — Renew lock
+ */
+app.patch('/:id/lock', zValidator('json', renewLockSchema), async (c) => {
     const input = c.req.valid('json');
     const user = c.get('user')!;
 

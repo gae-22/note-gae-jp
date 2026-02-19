@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useNote, useUpdateNote } from '@/hooks/use-note';
-import { useDeleteNote } from '@/hooks/use-notes';
+import { useNote, useUpdateNote } from '@/features/notes/hooks/use-note';
+import { useDeleteNote } from '@/features/notes/hooks/use-notes';
+import { useUpload } from '@/features/editor/hooks/use-upload';
 import { useAutoSave } from '@/hooks/use-auto-save';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import {
     Globe,
@@ -15,7 +15,6 @@ import {
     ArrowLeft,
     Trash2,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import {
     Select,
     SelectContent,
@@ -24,19 +23,18 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { NoteEditor } from '@/features/editor/components/NoteEditor';
 
 export const Route = createFileRoute('/notes/$noteId')({
-    component: NoteEditor,
+    component: NoteEditorPage,
 });
 
-function NoteEditor() {
+function NoteEditorPage() {
     const { noteId } = Route.useParams();
     const { data: note, isLoading, error } = useNote(noteId);
     const updateNote = useUpdateNote();
     const deleteNote = useDeleteNote();
+    const { upload } = useUpload(); // Implementation of useUpload hook
 
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
@@ -44,10 +42,6 @@ function NoteEditor() {
         'private' | 'public' | 'shared'
     >('private');
     const [isDirty, setIsDirty] = useState(false);
-    const [mode, setMode] = useState<'edit' | 'preview'>('edit');
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [isUploading, setIsUploading] = useState(false);
 
     // Sync state with fetched data
     useEffect(() => {
@@ -113,55 +107,6 @@ function NoteEditor() {
     const handleDelete = () => {
         if (window.confirm('Are you sure you want to delete this note?')) {
             deleteNote.mutate(noteId);
-        }
-    };
-
-    const handleFileUpload = async (
-        event: React.ChangeEvent<HTMLInputElement>,
-    ) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        setIsUploading(true);
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const response = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                throw new Error('Upload failed');
-            }
-
-            const data = await response.json();
-            const imageUrl = data.data.url;
-            const markdownImage = `![${file.name}](${imageUrl})`;
-
-            const textarea = textareaRef.current;
-            if (textarea) {
-                const start = textarea.selectionStart;
-                const end = textarea.selectionEnd;
-                const newContent =
-                    content.substring(0, start) +
-                    markdownImage +
-                    content.substring(end);
-                setContent(newContent);
-                setIsDirty(true);
-            } else {
-                setContent((prev) => prev + '\n' + markdownImage);
-                setIsDirty(true);
-            }
-            toast.success('File uploaded');
-        } catch {
-            toast.error('Failed to upload file');
-        } finally {
-            setIsUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
         }
     };
 
@@ -241,66 +186,6 @@ function NoteEditor() {
                         </SelectContent>
                     </Select>
 
-                    {/* Edit/Preview toggle */}
-                    <div className='flex items-center border rounded-md overflow-hidden'>
-                        <button
-                            onClick={() => setMode('edit')}
-                            className={cn(
-                                'px-3 py-2 text-sm font-medium transition-colors',
-                                mode === 'edit'
-                                    ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-50'
-                                    : 'bg-transparent text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-50',
-                            )}
-                        >
-                            Edit
-                        </button>
-                        <button
-                            onClick={() => setMode('preview')}
-                            className={cn(
-                                'px-3 py-2 text-sm font-medium transition-colors',
-                                mode === 'preview'
-                                    ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-50'
-                                    : 'bg-transparent text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-50',
-                            )}
-                        >
-                            Preview
-                        </button>
-                    </div>
-
-                    {/* File upload */}
-                    <input
-                        type='file'
-                        ref={fileInputRef}
-                        className='hidden'
-                        onChange={handleFileUpload}
-                        accept='image/*'
-                    />
-                    <Button
-                        variant='ghost'
-                        size='icon'
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading || mode === 'preview'}
-                        title='Upload Image'
-                    >
-                        {isUploading ? (
-                            <Loader2 className='h-4 w-4 animate-spin' />
-                        ) : (
-                            <svg
-                                xmlns='http://www.w3.org/2000/svg'
-                                width='16'
-                                height='16'
-                                viewBox='0 0 24 24'
-                                fill='none'
-                                stroke='currentColor'
-                                strokeWidth='2'
-                                strokeLinecap='round'
-                                strokeLinejoin='round'
-                            >
-                                <path d='m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48' />
-                            </svg>
-                        )}
-                    </Button>
-
                     {/* Save button */}
                     <Button
                         onClick={handleSave}
@@ -333,28 +218,17 @@ function NoteEditor() {
                 </div>
             </div>
 
-            {/* Editor / Preview */}
-            <div className='flex-1 min-h-0 border rounded-md shadow-sm bg-white dark:bg-stone-900 overflow-hidden relative'>
-                {mode === 'edit' ? (
-                    <Textarea
-                        ref={textareaRef}
-                        value={content}
-                        onChange={(
-                            e: React.ChangeEvent<HTMLTextAreaElement>,
-                        ) => {
-                            setContent(e.target.value);
-                            setIsDirty(true);
-                        }}
-                        className='w-full h-full p-4 resize-none border-none focus-visible:ring-0 font-mono text-sm leading-relaxed'
-                        placeholder='Start writing...'
-                    />
-                ) : (
-                    <div className='w-full h-full p-6 overflow-auto prose dark:prose-invert max-w-none'>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {content}
-                        </ReactMarkdown>
-                    </div>
-                )}
+            {/* Editor */}
+            <div className='flex-1 min-h-0 bg-white dark:bg-stone-900 rounded-md shadow-sm overflow-hidden'>
+                <NoteEditor
+                    key={noteId}
+                    content={content}
+                    onChange={(newContent) => {
+                        setContent(newContent);
+                        setIsDirty(true);
+                    }}
+                    onUploadImage={upload}
+                />
             </div>
 
             {/* Status bar */}

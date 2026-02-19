@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { useNotes, useCreateNote } from '@/hooks/use-notes';
+import { useNotes, useCreateNote } from '@/features/notes/hooks/use-notes';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import {
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { motion } from 'framer-motion';
 
 export const Route = createFileRoute('/_auth/')({
     component: Index,
@@ -106,56 +107,62 @@ function Index() {
                             : 'No notes found. Create your first note!'}
                     </div>
                 ) : (
-                    notesData?.items.map((note) => (
-                        <Link
+                    notesData?.items.map((note, index) => (
+                        <motion.div
                             key={note.id}
-                            to='/notes/$noteId'
-                            params={{ noteId: note.id }}
-                            className='block group'
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3, delay: index * 0.05 }}
                         >
-                            <Card className='h-full border-border/50 bg-card/50 backdrop-blur-sm hover:bg-card/80 hover:shadow-lg hover:-translate-y-1 transition-all duration-300'>
-                                <CardHeader className='pb-3'>
-                                    <div className='flex items-start justify-between gap-2'>
-                                        <CardTitle className='line-clamp-1 text-lg font-semibold tracking-tight group-hover:text-primary transition-colors'>
-                                            {note.icon && (
-                                                <span className='mr-2 opacity-80 group-hover:opacity-100 transition-opacity'>
-                                                    {note.icon}
+                            <Link
+                                to='/notes/$noteId'
+                                params={{ noteId: note.id }}
+                                className='block group h-full'
+                            >
+                                <Card className='h-full border-border/50 bg-card/50 backdrop-blur-sm hover:bg-card/80 hover:shadow-lg hover:-translate-y-1 transition-all duration-300'>
+                                    <CardHeader className='pb-3'>
+                                        <div className='flex items-start justify-between gap-2'>
+                                            <CardTitle className='line-clamp-1 text-lg font-semibold tracking-tight group-hover:text-primary transition-colors'>
+                                                {note.icon && (
+                                                    <span className='mr-2 opacity-80 group-hover:opacity-100 transition-opacity'>
+                                                        {note.icon}
+                                                    </span>
+                                                )}
+                                                {note.title || 'Untitled Note'}
+                                            </CardTitle>
+                                            <span
+                                                className={cn(
+                                                    'text-[10px] px-2 py-0.5 rounded-full font-medium border uppercase tracking-wider',
+                                                    note.visibility === 'public'
+                                                        ? 'bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-400'
+                                                        : note.visibility ===
+                                                            'shared'
+                                                          ? 'bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-400'
+                                                          : 'bg-muted/50 text-muted-foreground border-border/50',
+                                                )}
+                                            >
+                                                {note.visibility}
+                                            </span>
+                                        </div>
+                                        <CardDescription className='text-xs font-mono opacity-70'>
+                                            {formatDistanceToNow(
+                                                new Date(note.updatedAt),
+                                                { addSuffix: true },
+                                            )}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <p className='text-sm text-muted-foreground line-clamp-3 leading-relaxed'>
+                                            {note.contentMarkdown || (
+                                                <span className='italic opacity-50'>
+                                                    No preview available
                                                 </span>
                                             )}
-                                            {note.title || 'Untitled Note'}
-                                        </CardTitle>
-                                        <span
-                                            className={cn(
-                                                'text-[10px] px-2 py-0.5 rounded-full font-medium border uppercase tracking-wider',
-                                                note.visibility === 'public'
-                                                    ? 'bg-green-500/10 text-green-700 border-green-500/20 dark:text-green-400'
-                                                    : note.visibility ===
-                                                        'shared'
-                                                      ? 'bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-400'
-                                                      : 'bg-muted/50 text-muted-foreground border-border/50',
-                                            )}
-                                        >
-                                            {note.visibility}
-                                        </span>
-                                    </div>
-                                    <CardDescription className='text-xs font-mono opacity-70'>
-                                        {formatDistanceToNow(
-                                            new Date(note.updatedAt),
-                                            { addSuffix: true },
-                                        )}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className='text-sm text-muted-foreground line-clamp-3 leading-relaxed'>
-                                        {note.contentMarkdown || (
-                                            <span className='italic opacity-50'>
-                                                No preview available
-                                            </span>
-                                        )}
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        </Link>
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            </Link>
+                        </motion.div>
                     ))
                 )}
             </div>

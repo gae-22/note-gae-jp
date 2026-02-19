@@ -1,11 +1,11 @@
-import { Link } from '@tanstack/react-router';
+import { Link, useRouter } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
-import { FileText, LogOut, Plus, Loader2 } from 'lucide-react';
+import { LogOut, Plus, Loader2, Library, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ModeToggle } from '@/components/mode-toggle';
 import { rpc } from '@/lib/rpc';
-import { useRouter } from '@tanstack/react-router';
-import { useCreateNote } from '@/hooks/use-notes';
+import { useCreateNote } from '@/features/notes/hooks/use-notes';
+import { motion } from 'framer-motion';
 
 export function Sidebar({ className }: { className?: string }) {
     const router = useRouter();
@@ -18,20 +18,39 @@ export function Sidebar({ className }: { className?: string }) {
     };
 
     return (
-        <div
+        <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
-                'w-64 border-r bg-background/60 backdrop-blur-xl flex flex-col h-screen sticky top-0 z-30 transition-all duration-300',
+                'w-72 border-r border-border/40 bg-background/60 backdrop-blur-2xl flex flex-col h-screen sticky top-0 z-30',
+                'bg-linear-to-b from-background/80 to-background/40',
                 className,
             )}
         >
-            <div className='p-6 border-b border-border/40'>
-                <Link to='/' className='flex items-center gap-2 group'>
-                    <div className='bg-primary/10 p-2 rounded-lg group-hover:bg-primary/20 transition-colors'>
-                        <FileText className='h-6 w-6 text-primary' />
+            {/* Ambient Background Glow */}
+            <div className='absolute top-0 left-0 w-full h-32 bg-primary/5 blur-3xl -z-10' />
+            <div className='absolute bottom-0 right-0 w-full h-32 bg-secondary/5 blur-3xl -z-10' />
+
+            <div className='p-6 pb-2'>
+                <Link
+                    to='/'
+                    className='flex items-center gap-3 group px-2 py-1'
+                >
+                    <div className='relative'>
+                        <div className='absolute inset-0 bg-primary/20 blur-lg rounded-lg group-hover:bg-primary/30 transition-all duration-500' />
+                        <div className='bg-primary/10 p-2.5 rounded-xl border border-primary/10 relative backdrop-blur-sm group-hover:scale-105 transition-transform duration-300'>
+                            <Sparkles className='h-5 w-5 text-primary' />
+                        </div>
                     </div>
-                    <span className='font-bold text-xl tracking-tight bg-clip-text text-transparent bg-linear-to-r from-primary to-primary/70'>
-                        NoteGAE
-                    </span>
+                    <div className='flex flex-col'>
+                        <span className='font-bold text-lg tracking-tight bg-clip-text text-transparent bg-linear-to-r from-foreground to-foreground/70'>
+                            NoteGAE
+                        </span>
+                        <span className='text-[10px] text-muted-foreground font-medium tracking-widest uppercase opacity-70'>
+                            Workspace
+                        </span>
+                    </div>
                 </Link>
             </div>
 
@@ -39,52 +58,69 @@ export function Sidebar({ className }: { className?: string }) {
                 <Button
                     onClick={() => createNote.mutate()}
                     disabled={createNote.isPending}
-                    className='w-full justify-start shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5'
+                    className='w-full justify-start shadow-sm hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group border border-primary/10 bg-linear-to-r from-primary/10 to-transparent hover:from-primary/15'
+                    variant='ghost'
                     size='lg'
                 >
-                    {createNote.isPending ? (
-                        <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    ) : (
-                        <Plus className='mr-2 h-4 w-4' />
-                    )}
-                    New Note
+                    <div className='bg-primary/10 p-1.5 rounded-md mr-3 group-hover:scale-110 transition-transform'>
+                        {createNote.isPending ? (
+                            <Loader2 className='h-4 w-4 animate-spin text-primary' />
+                        ) : (
+                            <Plus className='h-4 w-4 text-primary' />
+                        )}
+                    </div>
+                    <span className='font-medium text-primary/90'>
+                        New Note
+                    </span>
                 </Button>
             </div>
 
-            <div className='px-3 py-2 flex-1 overflow-y-auto'>
-                <h2 className='mb-2 px-4 text-xs font-semibold tracking-wider text-muted-foreground uppercase'>
-                    Library
-                </h2>
-                <div className='space-y-1'>
-                    <Button
-                        variant='ghost'
-                        className='w-full justify-start'
-                        asChild
-                    >
-                        <Link to='/'>
-                            <FileText className='mr-2 h-4 w-4' />
-                            All Notes
-                        </Link>
-                    </Button>
+            <div className='px-4 py-2 flex-1 overflow-y-auto space-y-6'>
+                <div>
+                    <h2 className='mb-3 px-2 text-[10px] font-bold tracking-widest text-muted-foreground/60 uppercase select-none'>
+                        Navigation
+                    </h2>
+                    <div className='space-y-1'>
+                        <Button
+                            variant='ghost'
+                            className={cn(
+                                'w-full justify-start h-10 px-3 relative overflow-hidden',
+                                'hover:bg-accent/50 transition-all duration-300',
+                            )}
+                            asChild
+                        >
+                            <Link
+                                to='/'
+                                activeProps={{
+                                    className:
+                                        'bg-accent/60 text-accent-foreground font-medium',
+                                }}
+                            >
+                                <Library className='mr-3 h-4 w-4 opacity-70' />
+                                <span className='flex-1'>All Notes</span>
+                            </Link>
+                        </Button>
+                        {/* Placeholder for future links like "Favorites", "Tags", "Trash" */}
+                    </div>
                 </div>
             </div>
 
-            <div className='px-3 py-2 border-t border-border/40'>
-                <div className='space-y-1'>
-                    <div className='flex items-center justify-between px-4 py-2 text-sm text-muted-foreground'>
-                        <span>Theme</span>
+            <div className='p-4 border-t border-border/40 bg-linear-to-t from-background/80 to-transparent backdrop-blur-sm'>
+                <div className='space-y-2'>
+                    <div className='flex items-center justify-between px-3 py-2 text-sm text-muted-foreground bg-accent/20 rounded-lg border border-border/50'>
+                        <span className='text-xs font-medium'>Appearance</span>
                         <ModeToggle />
                     </div>
                     <Button
                         variant='ghost'
-                        className='w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20'
+                        className='w-full justify-start text-xs text-muted-foreground hover:text-red-500 hover:bg-red-500/5 transition-colors h-9 px-3'
                         onClick={handleLogout}
                     >
-                        <LogOut className='mr-2 h-4 w-4' />
-                        Logout
+                        <LogOut className='mr-3 h-3.5 w-3.5 opacity-70' />
+                        Sign Out
                     </Button>
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 }
