@@ -33,6 +33,24 @@
 - **Optical Corrections:** アイコン付きボタンのパディング調整や、カードの視覚的補正（`opticalCorrection`）を積極的に行い、洗練されたプロフェッショナルな外観を実現する。
 - **Icons:** `lucide-react` を使用する。shadcn/ui との親和性が高く、一貫したデザインを提供する。
 
+### 1.4 Design Vision (2026: Ambient & Spatial)
+
+"機能的ミニマリズム" と "有機的なインタラクション" を融合させた、State-of-the-Art な体験を目指す。
+
+1. **Ambient & Spatial (アンビエントかつ空間的)**
+    - フラットデザインのその先へ。過剰な装飾ではなく、微細な「深度（Depth）」と「光（Lighting）」で階層を表現する。
+    - 要素は画面に張り付くのではなく、空間に浮遊しているような軽やかさを持つこと。
+    - Tailwind v4の `oklch` カラーパレットを活用し、目に優しく、かつ発光感のある色使い。
+
+2. **Fluid & Organic Motion (流体的で有機的なモーション)**
+    - アニメーションは「装飾」ではなく「文脈の説明」として機能させる。
+    - 状態変化（保存中、モード切替）は、パキッと切り替わるのではなく、形状がモーフィングするように滑らかに変化させる（layout projection）。
+    - マイクロインタラクションには物理演算のような「重み」と「反発」を持たせる。
+
+3. **Intent-Centric Interface (意図中心のUI)**
+    - ユーザーが次に何をごしたいかを予測し、必要なUIだけが文脈に応じて浮き上がる（Progressive Disclosure）。
+    - 普段はコンテンツ（テキスト）が主役であり、クローム（ヘッダーやサイドバー）は極限まで存在感を消す。
+
 ### 1.2 ディレクトリ構造 (Feature-based)
 
 機能単位でコロケーションを行う (Co-location)。
@@ -298,81 +316,71 @@ Notionライクな操作感を実現するための設定。
 
 ---
 
-## 9. Modern UI/UX (GAE-JP Reference)
+## 9. 2026 UI/UX Implementation Specs
 
-目的: 参照サイト（https://github.com/gae-22/www-gae-jp, https://www.gae-jp.net）のモダンでクリーンなビジュアルを踏襲し、`note-gae-jp` の UI を洗練させる。以下は実装指針と具体的トークン、コンポーネント仕様で、フロントエンド実装チームがそのまま使えるレベルで記載する。
+既存の `frontend-design.md` の原則に加え、以下の 2026 Vision を実現するための具体的実装指針。
 
-### 9.1 デザイン原則
+### 9.1 Technical Foundation (Tailwind v4 & React 19)
 
-- **Clarity:** 余白とタイポグラフィで情報の優先順位を明確にする。
-- **Calm Contrast:** 強すぎないコントラスト、柔らかいアクセントカラーを使用し長時間の閲覧に耐える配色とする。
-- **Subtle Motion:** アニメーションは状態変化を助ける程度に留める（フェード、スケール、slide）。
-- **Component-first:** `shadcn/ui` と `Tailwind` をベースにアクセシブルな再利用コンポーネントを作る。
+- **Tailwind CSS v4 Integration:**
+    - CSS Variables を活用した動的テーマ切り替え。
+    - `@theme` ブロックを使用したデザインシステムの注入。
+    - `oklch()` カラーモデルの採用により、知覚的に均一な明度調整を行う。
 
-### 9.2 デザイントークン（Tailwind 拡張例）
+- **Animation & Interaction:**
+    - ライブラリ: `framer-motion` (または React 19 対応の軽量ライブラリ)
+    - **Spring Physics:** イージングカーブ（Bezier）ではなく、物理ベース（Stiffness, Damping）で「重み」を表現する。
+    - **Layout Projection:** `layoutId` を使用して、要素間の遷移をシームレスにつなぐ。
 
-Tailwind の `theme.extend` に次を追加することを推奨する。
+### 9.2 Design Tokens (Tailwind v4 Config Proposal)
 
-- Colors (例):
-    - `primary`: #0f766e (teal-700)
-    - `accent`: #7c3aed (violet-600)
-    - `muted`: #6b7280 (gray-500)
-    - `bg`: #0f172a (dark) / #ffffff (light)
-    - `surface`: #0b1220 (card background dark) / #f8fafc (light)
-    - `border`: rgba(15,23,42,0.06)
+```css
+@theme {
+    /* Ambient Lighting Colors (OKLCH) */
+    --color-ambient-bg: oklch(0.12 0.02 240); /* Deep distinct blue-grey */
+    --color-ambient-surface: oklch(0.16 0.03 240 / 0.8); /* Glass surface */
+    --color-ambient-highlight: oklch(0.98 0.01 240); /* Text high contrast */
+    --color-ambient-primary: oklch(0.7 0.15 160); /* Fresh Teal */
 
-- Typography:
-    - `fontFamily`: ['Inter', 'ui-sans-serif', 'system-ui']
-    - base: 16px, scale: 1rem (base), h1..h4: 2rem, 1.5rem, 1.25rem, 1rem
+    /* Depth & Shadows */
+    --shadow-glass:
+        0 4px 6px -1px oklch(0 0 0 / 0.1), 0 2px 4px -1px oklch(0 0 0 / 0.06),
+        inset 0 1px 0 0 oklch(1 1 1 / 0.1);
 
-- Spacing / Radius / Shadows:
-    - `spacing` scale 0.25rem steps (xs..xl)
-    - `radius`: sm=6px, md=10px, lg=14px
-    - `shadow`: small subtle card shadow and larger elevated shadow
+    /* Blur */
+    --blur-glass: 12px;
+}
+```
 
-例: `tailwind.config.cjs` への追加サンプルは Implementation に記載。
+### 9.3 Component Specifications
 
-### 9.3 主要コンポーネント仕様
+#### A. Ambient Sidebar (Navigation)
 
-- `Header`: ロゴ左、メインナビ、検索、アカウントメニュー（右）。最小高さ: 56px。スクロールでシャドウが現れる。
+- **Concept:** 常に存在するが主張しない「空気」のようなナビゲーション。
+- **Implementation:**
+    - 背景は `backdrop-filter: blur(var(--blur-glass))` と `bg-ambient-surface` で透過させる。
+    - ホバー時のみ、マウス位置に連動して「スポットライト」効果（Radial Gradient）が追従する。
+    - ステート変化（展開/折りたたみ）は `AnimatePresence` でコンテンツ自体をモーフィングさせる。
 
-- `Hero / Landing`: シンプルなキャッチ、サブテキスト、コールトゥアクション（Primary）、画像は背景グラデーションでアクセント。
+#### B. Fluid Note Card (List Item)
 
-- `NoteCard` (一覧):
-    - カードに `title`, `excerpt`, `meta` (updatedAt, visibility) を表示。
-    - Hover: 軽い上昇とシャドウ増し、右上にアクション（編集・メニュー）。
-    - レイアウト: grid (col 1..3) responsive
+- **Concept:** 接地面を持たず、磁力で浮遊するオブジェクト。
+- **Implementation:**
+    - `whileHover={{ scale: 1.02, y: -4 }}` で「浮き上がり」を表現。
+    - カーソルが近づくと、隣接するカードもわずかに反応する（Magnetic Grid effect）。
+    - クリック時の画面遷移は、カードが全画面に拡大するような **Shared Element Transition** を実装する。
 
-- `Editor`:
-    - フル幅のエディタ領域、左右の余白を確保。
-    - ツールバーは `sticky` にしてスクロールで常時アクセス可能。
-    - 画像プレビューはモーダルで拡大、クリックでダウンロード。
+#### C. Intent-Centric Editor (Toolbar)
 
-- `ShareDialog`:
-    - 共有リンクを大きく表示、コピーボタン、期限表示、無効化ボタン。
-    - 成功/エラーは `toast` でフィードバック。
+- **Concept:** 書く意思（Intent）がある時だけ具現化するツール。
+- **Implementation:**
+    - `BubbleMenu` (Tiptap) をカスタマイズし、テキスト選択時のみ「液状」に湧き出るアニメーションで表示。
+    - スラッシュコマンド (`/`) は、キャレットの近傍に物理的な重みを持ってポップアップする。
+    - 通常時のヘッダーやサイドバーは、スクロール開始とともに `opacity: 0` または `y: -100%` で退避し、没入モードへ移行する。
 
-- `FileUpload` (ドラッグ&ドロップ):
-    - ドロップ領域は dashed ボーダー、アイコン、プログレスバーを表示。
+### 9.4 Implementation Roadmap
 
-### 9.4 Microcopy & UX flows
-
-- ボタン文言は短く具体的に: `Save` → `Save draft`, `Publish` → `Publish note`。
-- 重要な破壊操作（Delete）には確認ダイアログと不可逆性の警告を必須にする。
-
-### 9.5 Accessibility & Responsiveness（補足）
-
-- 各コンポーネントはキーボードフォーカスが明確に見えること。
-- カラーコントラストは WCAG AA を満たすように確認。
-
-### 9.6 Implementation checklist
-
-1. `tailwind.config.cjs` に上記トークンを追加
-2. ルートの `packages/frontend/src/design/tokens.ts` を作成し TypeScript トークンをエクスポート
-3. `shadcn/ui` を導入し、`NoteCard`, `Header`, `EditorToolbar`, `ShareDialog` のコンポーネントを実装
-4. ライブラリ: `@headlessui/react` / `radix-ui` の一部コンポーネントを利用
-5. アニメーション: `framer-motion`（軽量使用）でページ間のトランジション・モーダルの出入りを実装
-
----
-
-参考: 参照元の `www-gae-jp` はシンプルで落ち着いた色調・広い余白が特徴です。視覚的な基準を合わせるため、配色やフォント、カード間隔を近づけてください。
+1. **Token Definition:** `index.css` に Tailwind v4 の `@theme` 定義を追加。
+2. **Base Components:** `shadcn/ui` のコンポーネントを `oklch` ベースに再スタイリング。
+3. **Motion System:** `framer-motion` の共通設定（`spring` config）をフック化 (`useOrganicMotion`)。
+4. **Layout Check:** サイドバーとメインエリアの Composition を再構築。
