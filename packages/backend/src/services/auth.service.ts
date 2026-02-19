@@ -1,7 +1,7 @@
 import { db } from '../db/client';
 import { users, sessions } from '../db/schema';
 import { eq } from 'drizzle-orm';
-import argon2 from 'argon2';
+import { verify } from 'argon2id';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 import type { z } from 'zod';
@@ -21,7 +21,7 @@ export const AuthService = {
             return null;
         }
 
-        const valid = await argon2.verify(user.passwordHash, input.password);
+        const valid = await verify(user.passwordHash, input.password);
         if (!valid) {
             return null;
         }
