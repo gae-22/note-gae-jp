@@ -11,6 +11,7 @@ import { Bold, Italic, Strikethrough, Code } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { SlashCommands, renderSlashCommands } from './SlashMenu';
+import { CustomCodeBlock } from '../extensions/CodeBlock';
 
 interface NoteEditorProps {
     content: string;
@@ -31,7 +32,9 @@ export function NoteEditor({
                 heading: {
                     levels: [1, 2, 3],
                 },
+                codeBlock: false, // Disable default codeBlock
             }),
+            CustomCodeBlock, // Add custom codeBlock
             Image,
             Link.configure({
                 openOnClick: false,
@@ -124,15 +127,17 @@ export function NoteEditor({
         },
     });
 
-    // Better effect for handling prop changes (e.g. loading a new note)
+    // Sync content prop with editor state
     useEffect(() => {
-        if (editor && content) {
+        if (editor && content !== undefined) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const currentMarkdown = (
                 editor.storage as any
             ).markdown.getMarkdown();
             if (currentMarkdown !== content) {
-                // Should potentially update content here if necessary, but relying on key prop for now
+                // Only update if content is different to avoid cursor jumps / loops
+                // We use emitUpdate: false to avoid triggering onUpdate and causing a loop
+                editor.commands.setContent(content, { emitUpdate: false });
             }
         }
     }, [content, editor]);

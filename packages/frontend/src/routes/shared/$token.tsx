@@ -4,6 +4,7 @@ import { rpc } from '@/lib/rpc';
 import { Loader2, ArrowLeft, Clock, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
+import { NoteEditor } from '@/features/editor/components/NoteEditor';
 
 export const Route = createFileRoute('/shared/$token')({
     component: SharedNotePage,
@@ -50,7 +51,7 @@ function SharedNotePage() {
         );
     }
 
-    const note = data.note;
+    const note = data;
 
     return (
         <div className='min-h-screen bg-background'>
@@ -90,10 +91,12 @@ function SharedNotePage() {
                     })}
                 </p>
 
-                <div className='prose prose-stone dark:prose-invert max-w-none'>
-                    <pre className='whitespace-pre-wrap font-sans text-base leading-relaxed'>
-                        {note.contentMarkdown || ''}
-                    </pre>
+                <div className='max-w-none'>
+                    <NoteEditor
+                        content={note.contentMarkdown || ''}
+                        onChange={() => {}}
+                        editable={false}
+                    />
                 </div>
             </main>
         </div>

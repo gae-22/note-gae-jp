@@ -44,15 +44,17 @@ function NoteEditorPage() {
     >('private');
     const [isDirty, setIsDirty] = useState(false);
     const [shareOpen, setShareOpen] = useState(false);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     // Sync state with fetched data
     useEffect(() => {
-        if (note) {
+        if (note && !isInitialized) {
             setTitle(note.title);
             setContent(note.contentMarkdown || '');
             setVisibility(note.visibility);
+            setIsInitialized(true);
         }
-    }, [note]);
+    }, [note, isInitialized]);
 
     const handleSave = useCallback(() => {
         if (!isDirty) return;
@@ -112,7 +114,7 @@ function NoteEditorPage() {
         }
     };
 
-    if (isLoading) {
+    if (isLoading || !isInitialized) {
         return (
             <div className='flex items-center justify-center h-full'>
                 <Loader2 className='h-8 w-8 animate-spin text-stone-500' />
