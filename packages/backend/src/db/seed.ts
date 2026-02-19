@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { db } from './client';
 import { users } from './schema';
-import argon2id from 'argon2id';
+import { hash as argon2Hash } from '@node-rs/argon2';
 import { ulid } from 'ulid';
 
 console.log('Seeding database...');
@@ -10,7 +10,7 @@ async function main() {
     const username = process.env.ADMIN_USERNAME || 'admin';
     const password = process.env.ADMIN_PASSWORD || 'password';
 
-    const hashedPassword = await argon2id.hash(password);
+    const hashedPassword = await argon2Hash(password);
 
     try {
         await db.insert(users).values({

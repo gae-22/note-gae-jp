@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Globe, Lock, Save, Share2, Loader2, ArrowLeft } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
     Select,
     SelectContent,
@@ -12,6 +13,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { useRef } from 'react';
 
 export const Route = createFileRoute('/notes/$noteId')({
     component: NoteEditor,
@@ -28,6 +33,10 @@ function NoteEditor() {
         'private' | 'public' | 'shared'
     >('private');
     const [isDirty, setIsDirty] = useState(false);
+    const [mode, setMode] = useState<'edit' | 'preview'>('edit');
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isUploading, setIsUploading] = useState(false);
 
     // Sync state with fetching data
     useEffect(() => {
@@ -54,6 +63,63 @@ function NoteEditor() {
                 },
             },
         );
+    };
+
+    const handleFileUpload = async (
+        event: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/api/uploads', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error('Upload failed');
+            }
+
+            const data = await response.json();
+            const imageUrl = data.data.url;
+            const markdownImage = `![${file.name}](${imageUrl})`;
+
+            // Insert into textarea
+            const textarea = textareaRef.current;
+            if (textarea) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const newContent =
+                    content.substring(0, start) +
+                    markdownImage +
+                    content.substring(end);
+
+                setContent(newContent);
+                setIsDirty(true);
+
+                // Restore cursor position after insertion (optional but nice)
+                // requestAnimationFrame(() => {
+                //     textarea.selectionStart = textarea.selectionEnd = start + markdownImage.length;
+                //     textarea.focus();
+                // });
+            } else {
+                setContent((prev) => prev + '\n' + markdownImage);
+                setIsDirty(true);
+            }
+        } catch (error) {
+            console.error('File upload error:', error);
+            alert('Failed to upload file.');
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
     };
 
     // Auto-save logic could go here (e.g. debounced effect)
@@ -126,6 +192,68 @@ function NoteEditor() {
                         </SelectContent>
                     </Select>
 
+                    <div className='flex items-center border rounded-md overflow-hidden'>
+                        <button
+                            onClick={() => setMode('edit')}
+                            className={cn(
+                                'px-3 py-2 text-sm font-medium transition-colors',
+                                mode === 'edit'
+                                    ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-50'
+                                    : 'bg-transparent text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-50',
+                            )}
+                        >
+                            Edit
+                        </button>
+                        <button
+                            onClick={() => setMode('preview')}
+                            className={cn(
+                                'px-3 py-2 text-sm font-medium transition-colors',
+                                mode === 'preview'
+                                    ? 'bg-stone-100 text-stone-900 dark:bg-stone-800 dark:text-stone-50'
+                                    : 'bg-transparent text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-50',
+                            )}
+                        >
+                            Preview
+                        </button>
+                    </div>
+
+                    <input
+                        type='file'
+                        ref={fileInputRef}
+                        className='hidden'
+                        onChange={handleFileUpload}
+                        accept='image/*'
+                    />
+
+                    <Button
+                        variant='ghost'
+                        size='icon'
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading || mode === 'preview'}
+                        title='Upload Image'
+                    >
+                        {isUploading ? (
+                            <Loader2 className='h-4 w-4 animate-spin' />
+                        ) : (
+                            <div className='flex items-center justify-center '>
+                                <svg
+                                    xmlns='http://www.w3.org/2000/svg'
+                                    width='24'
+                                    height='24'
+                                    viewBox='0 0 24 24'
+                                    fill='none'
+                                    stroke='currentColor'
+                                    strokeWidth='2'
+                                    strokeLinecap='round'
+                                    strokeLinejoin='round'
+                                    className='lucide lucide-paperclip h-4 w-4'
+                                >
+                                    <path d='m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48' />
+                                </svg>
+                            </div>
+                        )}
+                    </Button>
+
                     <Button
                         onClick={handleSave}
                         disabled={!isDirty || updateNote.isPending}
@@ -141,15 +269,26 @@ function NoteEditor() {
             </div>
 
             <div className='flex-1 min-h-0 border rounded-md shadow-sm bg-white dark:bg-stone-900 overflow-hidden relative'>
-                <Textarea
-                    value={content}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
-                        setContent(e.target.value);
-                        setIsDirty(true);
-                    }}
-                    className='w-full h-full p-4 resize-none border-none focus-visible:ring-0 font-mono text-sm leading-relaxed'
-                    placeholder='Start writing...'
-                />
+                {mode === 'edit' ? (
+                    <Textarea
+                        ref={textareaRef}
+                        value={content}
+                        onChange={(
+                            e: React.ChangeEvent<HTMLTextAreaElement>,
+                        ) => {
+                            setContent(e.target.value);
+                            setIsDirty(true);
+                        }}
+                        className='w-full h-full p-4 resize-none border-none focus-visible:ring-0 font-mono text-sm leading-relaxed'
+                        placeholder='Start writing...'
+                    />
+                ) : (
+                    <div className='w-full h-full p-6 overflow-auto prose dark:prose-invert max-w-none'>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {content}
+                        </ReactMarkdown>
+                    </div>
+                )}
             </div>
             <p className='text-xs text-stone-400 text-right'>
                 {isDirty ? 'Unsaved changes' : 'All changes saved'}

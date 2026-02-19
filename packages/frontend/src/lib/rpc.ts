@@ -10,5 +10,5 @@ export const client = hc<AppType>('/', {
 });
 
 // Helper for properly typed API calls
-// @ts-ignore - Temporary fix for unknown client type
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const rpc = (client as any).api;
