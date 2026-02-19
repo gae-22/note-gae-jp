@@ -1,7 +1,3 @@
-declare module 'ulid' {
-    export function ulid(seed?: number): string;
-}
-
 declare module 'argon2id' {
     const argon2id: {
         hash(password: string): Promise<string>;

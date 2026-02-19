@@ -27,4 +27,5 @@ app.use(
 // API Routes
 const apiRoutes = app.route('/api', routes);
 
+// Export type for RPC
 export type AppType = typeof apiRoutes;

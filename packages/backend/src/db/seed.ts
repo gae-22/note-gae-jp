@@ -1,6 +1,6 @@
 import { db } from './client';
 import { users } from './schema';
-import { hash } from 'argon2id';
+import argon2id from 'argon2id';
 import { ulid } from 'ulid';
 
 console.log('Seeding database...');
@@ -9,7 +9,7 @@ async function main() {
     const username = 'admin';
     const password = 'password';
 
-    const hashedPassword = await hash(password);
+    const hashedPassword = await argon2id.hash(password);
 
     try {
         await db.insert(users).values({

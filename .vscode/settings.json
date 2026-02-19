@@ -1,5 +1,5 @@
 {
     "files.associations": {
-        "globals.css": "tailwindcss"
+        "*.css": "tailwindcss"
     }
 }
