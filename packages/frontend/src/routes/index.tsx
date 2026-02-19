@@ -83,6 +83,24 @@ function Index() {
                         />
                     </div>
                 </section>
+
+                {/* Public Notes Showcase */}
+                <section className='py-20 px-4'>
+                    <div className='max-w-7xl mx-auto space-y-8'>
+                        <div className='text-center'>
+                            <h2 className='text-3xl font-bold tracking-tight'>
+                                Latest Public Notes
+                            </h2>
+                            <p className='text-muted-foreground mt-2'>
+                                Discover what others are sharing.
+                            </p>
+                        </div>
+                        <div className='mt-8'>
+                            {/* Passing visible params to fetch only public notes */}
+                            <PublicNoteList />
+                        </div>
+                    </div>
+                </section>
             </main>
 
             <footer className='border-t border-border/40 py-8 text-center text-sm text-muted-foreground'>
@@ -108,6 +126,32 @@ function FeatureCard({
             </div>
             <h3 className='text-xl font-semibold mb-2'>{title}</h3>
             <p className='text-muted-foreground'>{description}</p>
+        </div>
+    );
+}
+
+import { useNotes } from '@/features/notes/hooks/use-notes';
+import { Loader2 } from 'lucide-react';
+import { NoteCard } from '@/features/notes/components/NoteCard';
+
+function PublicNoteList() {
+    const { data, isLoading } = useNotes({ visibility: 'public', limit: 8 });
+
+    if (isLoading) {
+        return (
+            <div className='flex justify-center p-8'>
+                <Loader2 className='h-6 w-6 animate-spin text-muted-foreground' />
+            </div>
+        );
+    }
+
+    if (!data?.items?.length) return null;
+
+    return (
+        <div className='grid gap-6 sm:grid-cols-2 lg:grid-cols-4'>
+            {data.items.map((note) => (
+                <NoteCard key={note.id} note={note} />
+            ))}
         </div>
     );
 }

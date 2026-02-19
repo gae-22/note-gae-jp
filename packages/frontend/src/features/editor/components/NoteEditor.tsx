@@ -10,6 +10,7 @@ import { useEffect } from 'react';
 import { Bold, Italic, Strikethrough, Code } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { SlashCommands, renderSlashCommands } from './SlashMenu';
 
 interface NoteEditorProps {
     content: string;
@@ -42,6 +43,9 @@ export function NoteEditor({
             Markdown.configure({
                 transformPastedText: true,
                 transformCopiedText: true,
+            }),
+            SlashCommands.configure({
+                suggestion: renderSlashCommands(),
             }),
         ],
         content: content,

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { rpc } from '@/lib/rpc';
+import { rpc } from '@/lib/api-client';
 import { toast } from 'sonner';
 import type { Note } from './use-notes';
 

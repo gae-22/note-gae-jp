@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { rpc } from '@/lib/rpc';
+import { rpc } from '@/lib/api-client';
 
 export function useAuth() {
     const { data: user, isLoading } = useQuery({

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ulidSchema } from './common';
+import { ulidSchema } from './common.js';
 
 // Lock request (acquire)
 export const lockRequestSchema = z.object({

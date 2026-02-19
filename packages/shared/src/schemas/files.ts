@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ulidSchema } from './common';
+import { ulidSchema } from './common.js';
 
 export const uploadResponseSchema = z.object({
     id: ulidSchema,

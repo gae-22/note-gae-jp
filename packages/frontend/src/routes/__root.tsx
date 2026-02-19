@@ -7,6 +7,7 @@ import {
 import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, Home, RotateCcw, FileQuestion } from 'lucide-react';
+import { AuthProvider } from '@/features/auth/components/auth-provider';
 
 function NotFoundPage() {
     return (
@@ -68,13 +69,13 @@ function ErrorPage({ error }: { error: Error }) {
 
 export const Route = createRootRoute({
     component: () => (
-        <>
+        <AuthProvider>
             <Outlet />
             <ScrollRestoration />
             {import.meta.env.DEV && (
                 <TanStackRouterDevtools position='bottom-right' />
             )}
-        </>
+        </AuthProvider>
     ),
     notFoundComponent: () => <NotFoundPage />,
     errorComponent: ({ error }) => <ErrorPage error={error as Error} />,

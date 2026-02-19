@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ulidSchema, blockSchema, paginationSchema } from './common';
+import { ulidSchema, blockSchema, paginationSchema } from './common.js';
 
 // 共有有効期限オプション（visibility='shared' 時に使用）
 export const shareDurationSchema = z.enum(['1d', '7d', '30d', 'unlimited']);

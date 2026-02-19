@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ulidSchema } from './common';
+import { ulidSchema } from './common.js';
 
 export const loginSchema = z.object({
     username: z.string().min(1).max(50), // 空文字不可
