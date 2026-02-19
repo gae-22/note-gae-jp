@@ -18,4 +18,10 @@ if (!fs.existsSync(dir)) {
 }
 
 export const sqlite: DatabaseType = new Database(dbPath);
+
+// Spec: database-design.md §1.1 — WAL mode for better concurrency
+sqlite.pragma('journal_mode = WAL');
+// Spec: database-design.md §1.1 — Enable FK constraints
+sqlite.pragma('foreign_keys = ON');
+
 export const db = drizzle(sqlite, { schema });

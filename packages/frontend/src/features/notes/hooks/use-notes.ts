@@ -65,7 +65,7 @@ export function useCreateNote() {
             queryClient.invalidateQueries({ queryKey: ['notes'] });
             toast.success('Note created');
             router.navigate({
-                to: '/notes/$noteId',
+                to: '/admin/notes/$noteId',
                 params: { noteId: newNote.id },
             });
         },
@@ -92,7 +92,7 @@ export function useDeleteNote() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['notes'] });
             toast.success('Note deleted');
-            router.navigate({ to: '/' });
+            router.navigate({ to: '/admin' });
         },
         onError: () => {
             toast.error('Failed to delete note');

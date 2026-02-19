@@ -11,6 +11,7 @@ import { env } from './env';
 import routes from './routes';
 import path from 'path';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { sqlite } from './db/client';
 
 export const app = new Hono();
 
@@ -76,8 +77,18 @@ app.use('*', authMiddleware);
 // --- Global Error Handler (Spec: security.md §8) ---
 app.onError(errorHandler);
 
-// --- Health Check ---
-app.get('/health', (c) => c.json({ status: 'ok' }));
+// --- Health Checks (Spec: architecture.md §10.2) ---
+// Liveness: process is alive
+app.get('/healthz', (c) => c.json({ status: 'ok' }));
+// Readiness: DB connection check
+app.get('/readyz', (c) => {
+    try {
+        sqlite.prepare('SELECT 1').get();
+        return c.json({ status: 'ready', db: 'ok' });
+    } catch {
+        return c.json({ status: 'not ready', db: 'error' }, 503);
+    }
+});
 
 // --- Static File Serving ---
 const uploadsDir =

@@ -15,7 +15,7 @@ import { Plus, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
 
-export const Route = createFileRoute('/_auth/')({
+export const Route = createFileRoute('/_auth/admin/')({
     component: Index,
 });
 
@@ -115,7 +115,7 @@ function Index() {
                             transition={{ duration: 0.3, delay: index * 0.05 }}
                         >
                             <Link
-                                to='/notes/$noteId'
+                                to='/admin/notes/$noteId'
                                 params={{ noteId: note.id }}
                                 className='block group h-full'
                             >

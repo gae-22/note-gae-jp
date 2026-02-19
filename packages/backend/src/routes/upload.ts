@@ -2,12 +2,14 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { FileService } from '../services/file.service';
 import { requireAuth } from '../middleware/auth';
+import { uploadRateLimiter } from '../middleware/rate-limit';
 
 const app = new Hono();
 
 app.post(
     '/',
     requireAuth,
+    uploadRateLimiter,
     bodyLimit({
         maxSize: 10 * 1024 * 1024, // 10MB
         onError: (c) =>

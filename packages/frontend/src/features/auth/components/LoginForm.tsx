@@ -36,7 +36,7 @@ export function LoginForm() {
             if (res.ok) {
                 toast.success('Welcome back!');
                 await router.invalidate();
-                await router.navigate({ to: '/' });
+                await router.navigate({ to: '/admin' });
             } else {
                 setError('Invalid credentials');
                 toast.error('Invalid credentials');
