@@ -107,17 +107,18 @@ app.use(async (c, next) => {
 
 ### 1.3 エラーコード定義 (Strict Mapping)
 
-| コード                  | HTTP Status | 説明                                                       |
-| :---------------------- | :---------- | :--------------------------------------------------------- |
-| `BAD_REQUEST`           | 400         | バリデーションエラー、不正なパラメータ                     |
-| `UNAUTHORIZED`          | 401         | 未認証、セッション期限切れ、クッキー不備                   |
-| `FORBIDDEN`             | 403         | 権限不足 (他人のPrivateメモへのアクセス等)                 |
-| `NOT_FOUND`             | 404         | リソースが存在しない、またはアクセス権がなく隠蔽されている |
-| `METHOD_NOT_ALLOWED`    | 405         | 許可されていないHTTPメソッド                               |
-| `CONFLICT`              | 409         | データの整合性エラー (一意制約違反など)                    |
-| `PAYLOAD_TOO_LARGE`     | 413         | アップロードファイルサイズ超過                             |
-| `RATE_LIMIT_EXCEEDED`   | 429         | レート制限超過                                             |
-| `INTERNAL_SERVER_ERROR` | 500         | 予期せぬサーバーエラー                                     |
+| コード                   | HTTP Status | 説明                                                       |
+| :----------------------- | :---------- | :--------------------------------------------------------- |
+| `BAD_REQUEST`            | 400         | バリデーションエラー、不正なパラメータ                     |
+| `UNAUTHORIZED`           | 401         | 未認証、セッション期限切れ、クッキー不備                   |
+| `FORBIDDEN`              | 403         | 権限不足 (他人のPrivateメモへのアクセス等)                 |
+| `NOT_FOUND`              | 404         | リソースが存在しない、またはアクセス権がなく隠蔽されている |
+| `METHOD_NOT_ALLOWED`     | 405         | 許可されていないHTTPメソッド                               |
+| `CONFLICT`               | 409         | データの整合性エラー (一意制約違反、ロック競合など)        |
+| `PAYLOAD_TOO_LARGE`      | 413         | アップロードファイルサイズ超過                             |
+| `UNSUPPORTED_MEDIA_TYPE` | 415         | 未サポートのファイル形式                                   |
+| `RATE_LIMIT_EXCEEDED`    | 429         | レート制限超過                                             |
+| `INTERNAL_SERVER_ERROR`  | 500         | 予期せぬサーバーエラー                                     |
 
 ---
 
@@ -283,6 +284,9 @@ export const uploadResponseSchema = z.object({
     originalFilename: z.string(),
     mimeType: z.string(),
     size: z.number(),
+    width: z.number().nullable(),
+    height: z.number().nullable(),
+    blurhash: z.string().nullable(),
 });
 ```
 
@@ -313,7 +317,7 @@ export const uploadResponseSchema = z.object({
 
 - **権限ロジック (Strict):**
     - `currentUser` が**非null** (ログイン済): 全てのメモ (`private`, `public`, `shared`) を検索対象とする。ただし `params.visibility` が指定された場合はそれに従う。
-    - `currentUser` が**null** (ゲスト): 自動的に `visibility = 'public'` の条件を強制付与する。`params.visibility` で `private` を指定しても無視（またはエラー）とし、絶対に見せない。
+    - `currentUser` が**null** (ゲスト): 自動的に `visibility = 'public'` の条件を強制付与する。`params.visibility` で `private` や `shared` を指定しても無視（またはエラー）とし、**public 以外のメモは絶対に見せない**。
 
 #### `getByShareToken(token)`
 
@@ -375,6 +379,7 @@ export const uploadResponseSchema = z.object({
 | `PATCH`  | `/api/notes/:id`      | User | `Note.update`     | メモ更新                                         |
 | `DELETE` | `/api/notes/:id`      | User | `Note.delete`     | メモ削除                                         |
 | `POST`   | `/api/notes/:id/lock` | User | `Note.lock`       | メモ編集中の排他ロックを取得 (lock token を返す) |
+| `PATCH`  | `/api/notes/:id/lock` | User | `Note.extendLock` | ロック有効期限の延長 (Keep-alive)                |
 | `DELETE` | `/api/notes/:id/lock` | User | `Note.unlock`     | ロック解除 (作業完了時)                          |
 | `GET`    | `/api/notes/:id/lock` | Opt  | `Note.lockStatus` | 指定メモのロック状況を取得                       |
 | `GET`    | `/api/shared/:token`  | -    | `Note.getByToken` | 共有メモ取得                                     |

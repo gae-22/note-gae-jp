@@ -210,6 +210,25 @@ export const files = sqliteTable('files', {
     size: integer('size').notNull(),
 
     /**
+     * 画像の幅 (px)
+     * - 画像以外はNULL
+     */
+    width: integer('width'),
+
+    /**
+     * 画像の高さ (px)
+     * - 画像以外はNULL
+     */
+    height: integer('height'),
+
+    /**
+     * BlurHash (プレースホルダー用)
+     * - 短い文字列 (例: "LEHV6nWB2yk8pyo0adR*.7kCMdnj")
+     * - 画像以外はNULL
+     */
+    blurhash: text('blurhash'),
+
+    /**
      * 関連メモID
      * - NULL可 (未割り当てファイル用)
      * - ON DELETE SET NULL (メモが消えてもファイルメタデータは残す)

@@ -529,6 +529,14 @@ packages/frontend/src/features/notes/
 pnpm test:coverage
 ```
 
+### 7.5 Visual Architecture Testing (Snapshot)
+
+UI コンポーネントの意図しない変更を検知するため、Storybook または Playwright によるビジュアル回帰テストを推奨する。
+
+### 7.6 API Mocking
+
+統合テストおよびフロントエンド開発時は、**MSW (Mock Service Worker)** を使用してネットワークレベルで API をモックする。これにより、バックエンドの実装状況に依存せず、あらゆるエッジケース（エラー、遅延）を再現可能にする。
+
 ---
 
 ## 8. Git ワークフロー
@@ -712,3 +720,5 @@ for (const note of notes) {
 - [TanStack Query Documentation](https://tanstack.com/query/)
 - [Conventional Commits](https://www.conventionalcommits.org/)
 - [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- [LiftKit Documentation](https://www.chainlift.io/liftkit)
+- [Lucide Icons](https://lucide.dev/)

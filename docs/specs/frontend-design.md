@@ -19,9 +19,19 @@
 - **Core:** React 19, Vite, TypeScript (Strict Mode)
 - **Routing:** TanStack Router (File-based routing)
 - **State Management:** TanStack Query v5 (Server State), Nuqs (URL State)
-- **Styling:** Tailwind CSS v4, shadcn/ui (Radix UI base)
+- **Styling:** Tailwind CSS v4, **LiftKit** (Golden Ratio based system)
+- **UI Components:** **LiftKit** (Layout/Spacing), shadcn/ui (Base Components)
+- **Icons:** **Lucide React** (e.g. `lucide-react`)
 - **Editor:** Tiptap (Headless, Block-based feel)
 - **通知 (Toast):** sonner（shadcn/ui と相性が良い）
+
+### 1.3 Design Philosophy (LiftKit)
+
+**"Symmetry and Proportion through the Golden Ratio"**
+
+- **Framework:** [LiftKit](https://www.chainlift.io/liftkit) を採用し、全ての寸法（マージン、パディング、フォントサイズ、Border Radius）を**黄金比**に基づいて決定する。
+- **Optical Corrections:** アイコン付きボタンのパディング調整や、カードの視覚的補正（`opticalCorrection`）を積極的に行い、洗練されたプロフェッショナルな外観を実現する。
+- **Icons:** `lucide-react` を使用する。shadcn/ui との親和性が高く、一貫したデザインを提供する。
 
 ### 1.2 ディレクトリ構造 (Feature-based)
 
@@ -57,62 +67,10 @@ packages/frontend/src/
 
 ## 2. 型定義 (TypeScript Interfaces)
 
-バックエンドの API 定義 (`api-design.md`) と完全に一致させる。
-可能であれば `packages/shared` から型をインポートして利用するが、フロントエンド側で定義する場合も以下を厳守する。
-
-### 2.1 User
+バックエンドの API 定義 (`api-design.md`) と完全一致させるため、**原則として `packages/shared` から型をインポートして利用する。** フロントエンド独自での型再定義は行わない。
 
 ```typescript
-export interface User {
-    id: string; // ULID
-    username: string;
-    createdAt: string; // ISO 8601 Date String
-}
-```
-
-### 2.2 Note
-
-```typescript
-export interface Note {
-    id: string; // ULID
-    title: string;
-    // Canonical: blocks JSON
-    contentBlocks: Array<{
-        id: string;
-        type: string;
-        content: any;
-        props?: Record<string, any>;
-    }>;
-    // Optional derived Markdown
-    contentMarkdown?: string | null;
-    coverImage: string | null;
-    icon: string | null;
-    visibility: 'private' | 'public' | 'shared';
-    shareToken: string | null; // UUID v4
-    shareExpiresAt: string | null; // ISO 8601
-    createdAt: string; // ISO 8601
-    updatedAt: string; // ISO 8601
-}
-```
-
-### 2.3 ListNotesResponse（ページネーション付き一覧）
-
-```typescript
-export interface ListNotesResponse {
-    items: Note[];
-    total: number;
-    page: number;
-    limit: number;
-    hasNext: boolean;
-}
-```
-
-### 2.4 API Response Wrapper
-
-```typescript
-export type ApiResponse<T> =
-    | { success: true; data: T }
-    | { success: false; error: { code: string; message: string } };
+import type { User, Note, ListNotesResponse, ApiResponse } from '@shared/types';
 ```
 
 ---
@@ -290,7 +248,8 @@ Notionライクな操作感を実現するための設定。
 
 ### 7.3 `useUpload()`
 
-- **Returns:** `{ upload: (file: File) => Promise<string>, isUploading: boolean }`
+- **Returns:** `{ upload: (file: File) => Promise<UploadResponse>, isUploading: boolean }`
+- **Type:** `UploadResponse` includes `{ id, url, width, height, blurhash }` (from shared types).
 - **Behavior:**
     - ファイルアップロードAPIを叩き、URLを返す。
     - エディタやカバー画像変更で使用。
@@ -318,6 +277,24 @@ Notionライクな操作感を実現するための設定。
 ### 8.4 Keyboard Shortcuts
 
 - エディタ操作や保存ショートカットを提供する（例: `Mod+S` で保存、`Mod+B` 太字）。ショートカットは設定で無効化可能にする。
+
+### 8.5 SEO & OGP Strategy
+
+`NoteDetail` ページ（特に Public/Shared）では、適切なメタタグを出力する。
+
+- **Library:** `react-helmet-async` または TanStack Router の meta 機能を使用。
+- **Tags:**
+    - `<title>`: `Note Title | AppName`
+    - `<meta name="description">`: 本文の冒頭 120 文字（Markdown をプレーンテキストに変換して抽出）
+    - `og:image`: `coverImage` があればそれを設定。なければデフォルト OGP 画像。
+    - `twitter:card`: `summary_large_image`
+
+### 8.6 A11y Checklist (Concrete)
+
+- [ ] **Focus Management:** モーダル開閉時にフォーカスをトラップし、閉じたら元のボタンに戻す。
+- [ ] **Editor Toolbar:** 各ボタンに `aria-label` (例: "Bold", "Insert Image") を設定。
+- [ ] **Toast:** `role="status"` または `role="alert"` を適切に使い分ける。
+- [ ] **Keyboard Navigation:** `Tab` キーで全てのインタラクティブ要素に到達可能にする。カスタムコンポーネント（ドラッグハンドル等）も `Enter`/`Space` で操作可能にする。
 
 ---
 
