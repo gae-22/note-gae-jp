@@ -2,7 +2,9 @@ import { serve } from '@hono/node-server';
 import { app } from './app';
 export type { AppType } from './app';
 
-const port = 3000;
+import 'dotenv/config';
+
+const port = Number(process.env.PORT) || 3000;
 console.log(`Server is running on port ${port}`);
 
 serve({

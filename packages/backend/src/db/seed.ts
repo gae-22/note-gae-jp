@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { db } from './client';
 import { users } from './schema';
 import argon2id from 'argon2id';
@@ -6,8 +7,8 @@ import { ulid } from 'ulid';
 console.log('Seeding database...');
 
 async function main() {
-    const username = 'admin';
-    const password = 'password';
+    const username = process.env.ADMIN_USERNAME || 'admin';
+    const password = process.env.ADMIN_PASSWORD || 'password';
 
     const hashedPassword = await argon2id.hash(password);
 
