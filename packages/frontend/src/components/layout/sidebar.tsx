@@ -23,7 +23,7 @@ export function Sidebar({ className }: { className?: string }) {
             animate={{ x: 0, opacity: 1 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
-                'w-72 border-r border-border/40 bg-background/60 backdrop-blur-2xl flex flex-col h-screen sticky top-0 z-30',
+                'w-72 border-r border-border/40 bg-background/60 backdrop-blur-2xl hidden md:flex flex-col h-screen sticky top-0 z-30',
                 'bg-linear-to-b from-background/80 to-background/40',
                 className,
             )}

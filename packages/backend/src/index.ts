@@ -1,7 +1,6 @@
-import 'dotenv/config';
+import { env } from './env';
 import { serve } from '@hono/node-server';
 import { app } from './app';
-import { env } from './env';
 
 export type { AppType } from './app';
 

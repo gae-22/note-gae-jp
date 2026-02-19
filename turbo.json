@@ -12,7 +12,8 @@
         },
         "start": {
             "dependsOn": ["build"],
-            "persistent": true
+            "persistent": true,
+            "passThroughEnv": ["NODE_ENV"]
         },
         "db:migrate": {
             "cache": false

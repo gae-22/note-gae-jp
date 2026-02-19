@@ -132,12 +132,19 @@ function NoteEditorPage() {
     }
 
     return (
-        <div className='flex flex-col h-[calc(100vh-4rem)] space-y-4 max-w-4xl mx-auto'>
+        <div className='flex flex-col min-h-[calc(100vh-4rem)] md:min-h-screen space-y-0 max-w-5xl mx-auto'>
+            {/* Ambient Background */}
+            <div className='fixed top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[128px] -z-10 pointer-events-none' />
+
             {/* Header */}
-            <div className='flex items-center justify-between gap-4'>
-                <div className='flex items-center gap-2 flex-1'>
+            <div className='sticky top-0 md:top-0 z-10 bg-background/70 backdrop-blur-xl border-b border-border/40 px-4 py-3 flex items-center justify-between gap-4'>
+                <div className='flex items-center gap-2 flex-1 min-w-0'>
                     <Link to='/'>
-                        <Button variant='ghost' size='icon'>
+                        <Button
+                            variant='ghost'
+                            size='icon'
+                            className='shrink-0 hover:bg-accent/50'
+                        >
                             <ArrowLeft className='h-4 w-4' />
                         </Button>
                     </Link>
@@ -147,11 +154,11 @@ function NoteEditorPage() {
                             setTitle(e.target.value);
                             setIsDirty(true);
                         }}
-                        className='text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 h-auto'
+                        className='text-xl font-bold border-none shadow-none focus-visible:ring-0 px-1 h-auto bg-transparent truncate'
                         placeholder='Untitled Note'
                     />
                 </div>
-                <div className='flex items-center gap-2'>
+                <div className='flex items-center gap-2 shrink-0'>
                     <Select
                         value={visibility}
                         onValueChange={(
@@ -161,7 +168,7 @@ function NoteEditorPage() {
                             setIsDirty(true);
                         }}
                     >
-                        <SelectTrigger className='w-[130px]'>
+                        <SelectTrigger className='w-[120px] h-9 text-xs border-border/50 bg-background/50'>
                             <SelectValue placeholder='Visibility' />
                         </SelectTrigger>
                         <SelectContent>
@@ -191,13 +198,15 @@ function NoteEditorPage() {
                         onClick={handleSave}
                         disabled={!isDirty || updateNote.isPending}
                         variant={isDirty ? 'default' : 'outline'}
+                        size='sm'
+                        className='h-9 gap-1.5'
                     >
                         {updateNote.isPending ? (
-                            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                            <Loader2 className='h-3.5 w-3.5 animate-spin' />
                         ) : (
-                            <Save className='mr-2 h-4 w-4' />
+                            <Save className='h-3.5 w-3.5' />
                         )}
-                        Save
+                        <span className='hidden sm:inline'>Save</span>
                     </Button>
 
                     {/* Delete button */}
@@ -206,7 +215,7 @@ function NoteEditorPage() {
                         disabled={deleteNote.isPending}
                         variant='ghost'
                         size='icon'
-                        className='text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950'
+                        className='h-9 w-9 text-muted-foreground hover:text-red-500 hover:bg-red-500/10'
                         title='Delete Note'
                     >
                         {deleteNote.isPending ? (
@@ -219,7 +228,7 @@ function NoteEditorPage() {
             </div>
 
             {/* Editor */}
-            <div className='flex-1 min-h-0 bg-white dark:bg-stone-900 rounded-md shadow-sm overflow-hidden'>
+            <div className='flex-1 min-h-0 bg-card/30 dark:bg-card/20 backdrop-blur-sm rounded-none md:rounded-lg md:m-4 md:mt-4 overflow-hidden border-0 md:border md:border-border/40'>
                 <NoteEditor
                     key={noteId}
                     content={content}
@@ -232,12 +241,19 @@ function NoteEditorPage() {
             </div>
 
             {/* Status bar */}
-            <div className='flex items-center justify-between'>
-                <p className='text-xs text-stone-400'>
-                    {content.length} characters
+            <div className='flex items-center justify-between px-4 pb-3 md:pb-4 pt-2'>
+                <p className='text-xs text-muted-foreground/60 font-mono'>
+                    {content.length.toLocaleString()} chars
                 </p>
-                <p className='text-xs text-stone-400'>
-                    {isDirty ? '● Unsaved changes' : '✓ All changes saved'}
+                <p className='text-xs text-muted-foreground/60 flex items-center gap-1'>
+                    <span
+                        className={
+                            isDirty ? 'text-amber-500' : 'text-green-500'
+                        }
+                    >
+                        ●
+                    </span>
+                    {isDirty ? 'Unsaved changes' : 'All changes saved'}
                 </p>
             </div>
         </div>

@@ -14,15 +14,17 @@ export const Route = createFileRoute('/_auth')({
     component: AuthLayout,
 });
 
+import { MobileNav } from '@/components/layout/mobile-nav';
 import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts';
 
 function AuthLayout() {
     useGlobalShortcuts();
 
     return (
-        <div className='flex min-h-screen'>
+        <div className='flex min-h-screen flex-col md:flex-row'>
+            <MobileNav />
             <Sidebar />
-            <main className='flex-1 p-6'>
+            <main className='flex-1 p-4 md:p-6 overflow-x-hidden'>
                 <Outlet />
             </main>
         </div>

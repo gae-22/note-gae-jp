@@ -1,5 +1,5 @@
-// @ts-ignore - BubbleMenu import type error
 import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
@@ -7,6 +7,9 @@ import Link from '@tiptap/extension-link';
 import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
 import { Markdown } from 'tiptap-markdown';
 import { useEffect } from 'react';
+import { Bold, Italic, Strikethrough, Code } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface NoteEditorProps {
     content: string;
@@ -136,7 +139,68 @@ export function NoteEditor({
 
     return (
         <div className='relative border rounded-md min-h-[500px]'>
-            {/* BubbleMenu removed due to build error */}
+            {editor && (
+                <BubbleMenu editor={editor}>
+                    <div className='flex items-center gap-1 p-1 bg-white dark:bg-stone-800 border rounded shadow-md'>
+                        <Button
+                            variant='ghost'
+                            size='icon'
+                            className={cn(
+                                'h-8 w-8',
+                                editor.isActive('bold') &&
+                                    'bg-stone-100 dark:bg-stone-700',
+                            )}
+                            onClick={() =>
+                                editor.chain().focus().toggleBold().run()
+                            }
+                        >
+                            <Bold className='h-4 w-4' />
+                        </Button>
+                        <Button
+                            variant='ghost'
+                            size='icon'
+                            className={cn(
+                                'h-8 w-8',
+                                editor.isActive('italic') &&
+                                    'bg-stone-100 dark:bg-stone-700',
+                            )}
+                            onClick={() =>
+                                editor.chain().focus().toggleItalic().run()
+                            }
+                        >
+                            <Italic className='h-4 w-4' />
+                        </Button>
+                        <Button
+                            variant='ghost'
+                            size='icon'
+                            className={cn(
+                                'h-8 w-8',
+                                editor.isActive('strike') &&
+                                    'bg-stone-100 dark:bg-stone-700',
+                            )}
+                            onClick={() =>
+                                editor.chain().focus().toggleStrike().run()
+                            }
+                        >
+                            <Strikethrough className='h-4 w-4' />
+                        </Button>
+                        <Button
+                            variant='ghost'
+                            size='icon'
+                            className={cn(
+                                'h-8 w-8',
+                                editor.isActive('code') &&
+                                    'bg-stone-100 dark:bg-stone-700',
+                            )}
+                            onClick={() =>
+                                editor.chain().focus().toggleCode().run()
+                            }
+                        >
+                            <Code className='h-4 w-4' />
+                        </Button>
+                    </div>
+                </BubbleMenu>
+            )}
             <EditorContent editor={editor} />
         </div>
     );
