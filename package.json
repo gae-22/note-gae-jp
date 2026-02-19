@@ -1,0 +1,19 @@
+{
+    "name": "note-gae-jp",
+    "private": true,
+    "scripts": {
+        "build": "turbo run build",
+        "dev": "turbo run dev",
+        "lint": "turbo run lint",
+        "format": "biome format --write .",
+        "check": "biome check --apply .",
+        "db:generate": "pnpm --filter backend db:generate",
+        "db:migrate": "pnpm --filter backend db:migrate"
+    },
+    "devDependencies": {
+        "@biomejs/biome": "^2.4.2",
+        "turbo": "^2.8.10",
+        "typescript": "^5.9.3"
+    },
+    "packageManager": "pnpm@9.0.0"
+}

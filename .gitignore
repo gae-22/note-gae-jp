@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+.env
+*.db
+*.sqlite
+*.sqlite3
+*.log
+coverage
+.turbo
+.vercel
+.output

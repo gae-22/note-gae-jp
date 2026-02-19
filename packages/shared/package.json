@@ -1,0 +1,18 @@
+{
+    "name": "@note-gae-jp/shared",
+    "version": "0.0.0",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "lint": "biome check .",
+        "format": "biome format --write ."
+    },
+    "dependencies": {
+        "zod": "^3.22.4"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.3"
+    }
+}
