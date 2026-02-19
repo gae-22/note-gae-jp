@@ -105,6 +105,7 @@ export const usersRelations = relations(users, ({ many }) => ({
 
 export const notesRelations = relations(notes, ({ many }) => ({
     files: many(files),
+    locks: many(noteLocks),
 }));
 
 export const filesRelations = relations(files, ({ one }) => ({
@@ -117,6 +118,17 @@ export const filesRelations = relations(files, ({ one }) => ({
 export const sessionsRelations = relations(sessions, ({ one }) => ({
     user: one(users, {
         fields: [sessions.userId],
+        references: [users.id],
+    }),
+}));
+
+export const noteLocksRelations = relations(noteLocks, ({ one }) => ({
+    note: one(notes, {
+        fields: [noteLocks.noteId],
+        references: [notes.id],
+    }),
+    owner: one(users, {
+        fields: [noteLocks.ownerId],
         references: [users.id],
     }),
 }));

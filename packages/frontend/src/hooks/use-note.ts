@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rpc } from '@/lib/rpc';
+import { toast } from 'sonner';
 import type { Note } from './use-notes';
 
 export function useNote(noteId: string) {
@@ -12,7 +13,8 @@ export function useNote(noteId: string) {
             if (!res.ok) {
                 throw new Error('Failed to fetch note');
             }
-            return (await res.json()) as Note;
+            const json = await res.json();
+            return (json.data ?? json) as Note;
         },
         enabled: !!noteId,
     });
@@ -40,13 +42,17 @@ export function useUpdateNote() {
             if (!res.ok) {
                 throw new Error('Failed to update note');
             }
-            return (await res.json()) as Note;
+            const json = await res.json();
+            return (json.data ?? json) as Note;
         },
         onSuccess: (updatedNote) => {
             queryClient.invalidateQueries({
                 queryKey: ['notes', updatedNote.id],
             });
             queryClient.invalidateQueries({ queryKey: ['notes'] });
+        },
+        onError: () => {
+            toast.error('Failed to save note');
         },
     });
 }

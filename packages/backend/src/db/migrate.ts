@@ -1,6 +1,10 @@
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { db, sqlite } from './client';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function main() {
     console.log('Running migrations...');

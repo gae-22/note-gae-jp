@@ -1,6 +1,6 @@
 import { db } from '../db/client';
 import { notes } from '../db/schema';
-import { eq, and, or, desc, like, sql } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { ulid } from 'ulid';
 import { v4 as uuidv4 } from 'uuid';
 import type { z } from 'zod';
@@ -178,59 +178,99 @@ export const NoteService = {
     },
 
     async list(
-        params: z.infer<typeof listNotesQuerySchema>,
+        input: z.infer<typeof listNotesQuerySchema>,
         currentUser?: { id: string } | null,
     ) {
-        const page = params.page || 1;
-        const limit = params.limit || 20;
+        const page = input.page || 1;
+        const limit = input.limit || 20;
         const offset = (page - 1) * limit;
 
         const conditions = [];
 
         // Visibility Filter
         if (currentUser) {
-            // Admin: can see all. If params.visibility set, filter by it.
-            if (params.visibility) {
-                conditions.push(eq(notes.visibility, params.visibility));
+            // Admin: can see all. If input.visibility set, filter by it.
+            if (input.visibility) {
+                conditions.push(eq(notes.visibility, input.visibility));
             }
         } else {
             // Guest: ONLY public.
             conditions.push(eq(notes.visibility, 'public'));
         }
 
-        // Search (Simple match for now, or FTS later)
-        if (params.q) {
-            conditions.push(
-                or(
-                    like(notes.title, `%${params.q}%`),
-                    like(notes.contentMarkdown, `%${params.q}%`), // Fallback search
-                ),
-            );
+        // FTS Search (Spec: database-design.md §FTS5)
+        if (input.q) {
+            // Using raw SQL for FTS5 + JOIN with notes table
+            const whereConditions =
+                conditions.length > 0 ? and(...conditions) : sql`1=1`;
+
+            // FTS Match query
+            const searchQuery = sql`
+                SELECT n.* FROM notes n
+                JOIN notes_fts fts ON n.rowid = fts.rowid
+                WHERE fts MATCH ${input.q}
+                AND ${whereConditions}
+                ORDER BY fts.rank
+                LIMIT ${limit} OFFSET ${offset}
+            `;
+
+            const results = await db.all(searchQuery);
+
+            // Count query for pagination
+            const countQuery = sql`
+                SELECT COUNT(*) as count FROM notes_fts fts
+                JOIN notes n ON n.rowid = fts.rowid
+                WHERE fts MATCH ${input.q}
+                AND ${whereConditions}
+            `;
+
+            // Explicitly cast the result to avoid type errors
+            const countRes = (await db.get(countQuery)) as
+                | { count: number }
+                | undefined;
+            const total = countRes ? countRes.count : 0;
+
+            return {
+                items: results.map((n: any) => ({
+                    ...n,
+                    createdAt: new Date(n.createdAt),
+                    updatedAt: new Date(n.updatedAt),
+                    shareExpiresAt: n.shareExpiresAt
+                        ? new Date(n.shareExpiresAt)
+                        : null,
+                })),
+                total,
+                page,
+                limit,
+                hasNext: offset + results.length < total,
+            };
         }
 
+        // Standard list without FTS
         const where = conditions.length > 0 ? and(...conditions) : undefined;
 
         const results = await db
             .select()
             .from(notes)
             .where(where)
-            .orderBy(desc(notes.updatedAt)) // Default sort
+            .orderBy(desc(notes.updatedAt))
             .limit(limit)
             .offset(offset);
 
+        // Count for standard list
         const [countResult] = await db
             .select({ count: sql<number>`count(*)` })
             .from(notes)
             .where(where);
 
-        const count = countResult?.count ?? 0;
+        const total = countResult?.count ?? 0;
 
         return {
             items: results,
-            total: count,
+            total,
             page,
             limit,
-            hasNext: offset + results.length < count,
+            hasNext: offset + results.length < total,
         };
     },
 };

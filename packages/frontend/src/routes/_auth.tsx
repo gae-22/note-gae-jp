@@ -14,7 +14,11 @@ export const Route = createFileRoute('/_auth')({
     component: AuthLayout,
 });
 
+import { useGlobalShortcuts } from '@/hooks/use-global-shortcuts';
+
 function AuthLayout() {
+    useGlobalShortcuts();
+
     return (
         <div className='flex min-h-screen'>
             <Sidebar />

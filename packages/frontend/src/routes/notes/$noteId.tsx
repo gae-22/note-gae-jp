@@ -1,10 +1,20 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useNote, useUpdateNote } from '@/hooks/use-note';
-import { useEffect, useState } from 'react';
+import { useDeleteNote } from '@/hooks/use-notes';
+import { useAutoSave } from '@/hooks/use-auto-save';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Globe, Lock, Save, Share2, Loader2, ArrowLeft } from 'lucide-react';
+import {
+    Globe,
+    Lock,
+    Save,
+    Share2,
+    Loader2,
+    ArrowLeft,
+    Trash2,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
     Select,
@@ -13,10 +23,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { toast } from 'sonner';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useRef } from 'react';
 
 export const Route = createFileRoute('/notes/$noteId')({
     component: NoteEditor,
@@ -26,6 +36,7 @@ function NoteEditor() {
     const { noteId } = Route.useParams();
     const { data: note, isLoading, error } = useNote(noteId);
     const updateNote = useUpdateNote();
+    const deleteNote = useDeleteNote();
 
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
@@ -38,7 +49,7 @@ function NoteEditor() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);
 
-    // Sync state with fetching data
+    // Sync state with fetched data
     useEffect(() => {
         if (note) {
             setTitle(note.title);
@@ -47,7 +58,8 @@ function NoteEditor() {
         }
     }, [note]);
 
-    const handleSave = () => {
+    const handleSave = useCallback(() => {
+        if (!isDirty) return;
         updateNote.mutate(
             {
                 id: noteId,
@@ -60,9 +72,48 @@ function NoteEditor() {
             {
                 onSuccess: () => {
                     setIsDirty(false);
+                    toast.success('Saved');
                 },
             },
         );
+    }, [noteId, title, content, visibility, isDirty, updateNote]);
+
+    // Auto-save with 1.5s debounce
+    const { trigger: triggerAutoSave, flush: flushAutoSave } = useAutoSave(
+        handleSave,
+        1500,
+    );
+
+    // Trigger auto-save when content changes
+    useEffect(() => {
+        if (isDirty) {
+            triggerAutoSave();
+        }
+    }, [isDirty, title, content, triggerAutoSave]);
+
+    // Flush auto-save on unmount (navigate away)
+    useEffect(() => {
+        return () => {
+            flushAutoSave();
+        };
+    }, [flushAutoSave]);
+
+    // Keyboard shortcut: Ctrl/Cmd+S to save
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+                e.preventDefault();
+                handleSave();
+            }
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [handleSave]);
+
+    const handleDelete = () => {
+        if (window.confirm('Are you sure you want to delete this note?')) {
+            deleteNote.mutate(noteId);
+        }
     };
 
     const handleFileUpload = async (
@@ -76,7 +127,7 @@ function NoteEditor() {
         formData.append('file', file);
 
         try {
-            const response = await fetch('/api/uploads', {
+            const response = await fetch('/api/upload', {
                 method: 'POST',
                 body: formData,
             });
@@ -89,7 +140,6 @@ function NoteEditor() {
             const imageUrl = data.data.url;
             const markdownImage = `![${file.name}](${imageUrl})`;
 
-            // Insert into textarea
             const textarea = textareaRef.current;
             if (textarea) {
                 const start = textarea.selectionStart;
@@ -98,22 +148,15 @@ function NoteEditor() {
                     content.substring(0, start) +
                     markdownImage +
                     content.substring(end);
-
                 setContent(newContent);
                 setIsDirty(true);
-
-                // Restore cursor position after insertion (optional but nice)
-                // requestAnimationFrame(() => {
-                //     textarea.selectionStart = textarea.selectionEnd = start + markdownImage.length;
-                //     textarea.focus();
-                // });
             } else {
                 setContent((prev) => prev + '\n' + markdownImage);
                 setIsDirty(true);
             }
-        } catch (error) {
-            console.error('File upload error:', error);
-            alert('Failed to upload file.');
+            toast.success('File uploaded');
+        } catch {
+            toast.error('Failed to upload file');
         } finally {
             setIsUploading(false);
             if (fileInputRef.current) {
@@ -121,8 +164,6 @@ function NoteEditor() {
             }
         }
     };
-
-    // Auto-save logic could go here (e.g. debounced effect)
 
     if (isLoading) {
         return (
@@ -147,16 +188,24 @@ function NoteEditor() {
 
     return (
         <div className='flex flex-col h-[calc(100vh-4rem)] space-y-4 max-w-4xl mx-auto'>
+            {/* Header */}
             <div className='flex items-center justify-between gap-4'>
-                <Input
-                    value={title}
-                    onChange={(e) => {
-                        setTitle(e.target.value);
-                        setIsDirty(true);
-                    }}
-                    className='text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 h-auto'
-                    placeholder='Untitled Note'
-                />
+                <div className='flex items-center gap-2 flex-1'>
+                    <Link to='/'>
+                        <Button variant='ghost' size='icon'>
+                            <ArrowLeft className='h-4 w-4' />
+                        </Button>
+                    </Link>
+                    <Input
+                        value={title}
+                        onChange={(e) => {
+                            setTitle(e.target.value);
+                            setIsDirty(true);
+                        }}
+                        className='text-2xl font-bold border-none shadow-none focus-visible:ring-0 px-0 h-auto'
+                        placeholder='Untitled Note'
+                    />
+                </div>
                 <div className='flex items-center gap-2'>
                     <Select
                         value={visibility}
@@ -192,6 +241,7 @@ function NoteEditor() {
                         </SelectContent>
                     </Select>
 
+                    {/* Edit/Preview toggle */}
                     <div className='flex items-center border rounded-md overflow-hidden'>
                         <button
                             onClick={() => setMode('edit')}
@@ -217,6 +267,7 @@ function NoteEditor() {
                         </button>
                     </div>
 
+                    {/* File upload */}
                     <input
                         type='file'
                         ref={fileInputRef}
@@ -224,7 +275,6 @@ function NoteEditor() {
                         onChange={handleFileUpload}
                         accept='image/*'
                     />
-
                     <Button
                         variant='ghost'
                         size='icon'
@@ -235,28 +285,27 @@ function NoteEditor() {
                         {isUploading ? (
                             <Loader2 className='h-4 w-4 animate-spin' />
                         ) : (
-                            <div className='flex items-center justify-center '>
-                                <svg
-                                    xmlns='http://www.w3.org/2000/svg'
-                                    width='24'
-                                    height='24'
-                                    viewBox='0 0 24 24'
-                                    fill='none'
-                                    stroke='currentColor'
-                                    strokeWidth='2'
-                                    strokeLinecap='round'
-                                    strokeLinejoin='round'
-                                    className='lucide lucide-paperclip h-4 w-4'
-                                >
-                                    <path d='m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48' />
-                                </svg>
-                            </div>
+                            <svg
+                                xmlns='http://www.w3.org/2000/svg'
+                                width='16'
+                                height='16'
+                                viewBox='0 0 24 24'
+                                fill='none'
+                                stroke='currentColor'
+                                strokeWidth='2'
+                                strokeLinecap='round'
+                                strokeLinejoin='round'
+                            >
+                                <path d='m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48' />
+                            </svg>
                         )}
                     </Button>
 
+                    {/* Save button */}
                     <Button
                         onClick={handleSave}
                         disabled={!isDirty || updateNote.isPending}
+                        variant={isDirty ? 'default' : 'outline'}
                     >
                         {updateNote.isPending ? (
                             <Loader2 className='mr-2 h-4 w-4 animate-spin' />
@@ -265,9 +314,26 @@ function NoteEditor() {
                         )}
                         Save
                     </Button>
+
+                    {/* Delete button */}
+                    <Button
+                        onClick={handleDelete}
+                        disabled={deleteNote.isPending}
+                        variant='ghost'
+                        size='icon'
+                        className='text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950'
+                        title='Delete Note'
+                    >
+                        {deleteNote.isPending ? (
+                            <Loader2 className='h-4 w-4 animate-spin' />
+                        ) : (
+                            <Trash2 className='h-4 w-4' />
+                        )}
+                    </Button>
                 </div>
             </div>
 
+            {/* Editor / Preview */}
             <div className='flex-1 min-h-0 border rounded-md shadow-sm bg-white dark:bg-stone-900 overflow-hidden relative'>
                 {mode === 'edit' ? (
                     <Textarea
@@ -290,9 +356,16 @@ function NoteEditor() {
                     </div>
                 )}
             </div>
-            <p className='text-xs text-stone-400 text-right'>
-                {isDirty ? 'Unsaved changes' : 'All changes saved'}
-            </p>
+
+            {/* Status bar */}
+            <div className='flex items-center justify-between'>
+                <p className='text-xs text-stone-400'>
+                    {content.length} characters
+                </p>
+                <p className='text-xs text-stone-400'>
+                    {isDirty ? '● Unsaved changes' : '✓ All changes saved'}
+                </p>
+            </div>
         </div>
     );
 }

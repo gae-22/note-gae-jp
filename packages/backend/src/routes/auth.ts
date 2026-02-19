@@ -1,60 +1,64 @@
 import { Hono } from 'hono';
-import { setCookie, deleteCookie } from 'hono/cookie';
+import { setCookie, getCookie, deleteCookie } from 'hono/cookie';
 import { zValidator } from '@hono/zod-validator';
 import { loginSchema } from '@note-gae-jp/shared';
 import { AuthService } from '../services/auth.service';
 import { requireAuth } from '../middleware/auth';
+import { loginRateLimiter } from '../middleware/rate-limit';
+import { env } from '../env';
 
 const app = new Hono();
 
-app.post('/login', zValidator('json', loginSchema), async (c) => {
-    const input = c.req.valid('json');
-    const result = await AuthService.login(input);
+// Login — with rate limiting (Spec: security.md §4)
+app.post(
+    '/login',
+    loginRateLimiter,
+    zValidator('json', loginSchema),
+    async (c) => {
+        const input = c.req.valid('json');
+        const result = await AuthService.login(input);
 
-    if (!result) {
-        return c.json(
-            {
-                success: false,
-                error: {
-                    code: 'UNAUTHORIZED',
-                    message: 'Invalid credentials',
+        if (!result) {
+            return c.json(
+                {
+                    success: false,
+                    error: {
+                        code: 'UNAUTHORIZED',
+                        message: 'Invalid credentials',
+                    },
                 },
-            },
-            401,
-        );
-    }
+                401,
+            );
+        }
 
-    setCookie(c, 'session_id', result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'Lax',
-        path: '/',
-        expires: result.expiresAt,
-    });
+        setCookie(c, 'session_id', result.token, {
+            httpOnly: true,
+            secure: env.NODE_ENV === 'production',
+            sameSite: 'Lax',
+            path: '/',
+            expires: result.expiresAt,
+        });
 
-    return c.json({
-        success: true,
-        data: { user: result.user },
-    });
-});
+        return c.json({
+            success: true,
+            data: { user: result.user },
+        });
+    },
+);
 
+// Logout — delete session from DB AND clear cookie (Spec fix: was only clearing cookie)
 app.post('/logout', requireAuth, async (c) => {
-    // We can assume session_id exists because of requireAuth,
-    // but AuthService.logout handles invalid tokens gracefully anyway.
-    // However, to be strict, we get the token from cookie.
-    // Optimization: we could store token in c.var if needed, but cookie access is cheap.
-    // Actually, `requireAuth` doesn't strictly guarantee cookie presence if we used other auth methods,
-    // but here it is cookie based.
+    const token = getCookie(c, 'session_id');
 
-    // Better: get cookie, if exists validation.
-    // Wait, requireAuth checks cookie and sets user.
-
-    // Let's just delete the cookie.
+    if (token) {
+        await AuthService.logout(token);
+    }
 
     deleteCookie(c, 'session_id');
     return c.json({ success: true, data: null });
 });
 
+// Get current user
 app.get('/me', async (c) => {
     const user = c.get('user');
     return c.json({

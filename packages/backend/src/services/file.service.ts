@@ -4,6 +4,7 @@ import { ulid } from 'ulid';
 import path from 'path';
 import fs from 'fs/promises';
 import { existsSync, mkdirSync } from 'fs';
+import { and, isNull, lt, eq } from 'drizzle-orm';
 
 const UPLOADS_DIR =
     process.env.UPLOADS_DIR || path.resolve(process.cwd(), '../../uploads');
@@ -71,5 +72,37 @@ export const FileService = {
             ...record,
             url,
         };
+    },
+
+    async cleanupOrphans(retentionDays = 1) {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+        // Find orphan files older than cutoff
+        // Orphan means noteId is null
+        const orphans = await db
+            .select()
+            .from(files)
+            .where(and(isNull(files.noteId), lt(files.uploadedAt, cutoffDate)));
+
+        console.log(`Found ${orphans.length} orphan files to cleanup.`);
+
+        let deletedCount = 0;
+        for (const file of orphans) {
+            try {
+                const absolutePath = path.join(UPLOADS_DIR, file.path);
+                // Delete from disk
+                if (existsSync(absolutePath)) {
+                    await fs.unlink(absolutePath);
+                }
+                // Delete from DB
+                await db.delete(files).where(eq(files.id, file.id));
+                deletedCount++;
+            } catch (err) {
+                console.error(`Failed to cleanup orphan file ${file.id}:`, err);
+            }
+        }
+
+        return { found: orphans.length, deleted: deletedCount };
     },
 };
