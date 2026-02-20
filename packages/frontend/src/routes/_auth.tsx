@@ -10,6 +10,12 @@ export const Route = createFileRoute('/_auth')({
                 to: '/login',
             });
         }
+        const json = await res.json();
+        if (!json.success || !json.data.user) {
+            throw redirect({
+                to: '/login',
+            });
+        }
     },
     component: AuthLayout,
 });

@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthRouteImport } from './routes/_auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SharedTokenRouteImport } from './routes/shared/$token'
+import { Route as NotesNoteIdRouteImport } from './routes/notes/$noteId'
 import { Route as AuthAdminIndexRouteImport } from './routes/_auth/admin/index'
 import { Route as AuthAdminNotesNoteIdRouteImport } from './routes/_auth/admin/notes/$noteId'
 
@@ -35,6 +36,11 @@ const SharedTokenRoute = SharedTokenRouteImport.update({
   path: '/shared/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NotesNoteIdRoute = NotesNoteIdRouteImport.update({
+  id: '/notes/$noteId',
+  path: '/notes/$noteId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthAdminIndexRoute = AuthAdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
@@ -49,6 +55,7 @@ const AuthAdminNotesNoteIdRoute = AuthAdminNotesNoteIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/notes/$noteId': typeof NotesNoteIdRoute
   '/shared/$token': typeof SharedTokenRoute
   '/admin/': typeof AuthAdminIndexRoute
   '/admin/notes/$noteId': typeof AuthAdminNotesNoteIdRoute
@@ -56,6 +63,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/notes/$noteId': typeof NotesNoteIdRoute
   '/shared/$token': typeof SharedTokenRoute
   '/admin': typeof AuthAdminIndexRoute
   '/admin/notes/$noteId': typeof AuthAdminNotesNoteIdRoute
@@ -65,6 +73,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_auth': typeof AuthRouteWithChildren
   '/login': typeof LoginRoute
+  '/notes/$noteId': typeof NotesNoteIdRoute
   '/shared/$token': typeof SharedTokenRoute
   '/_auth/admin/': typeof AuthAdminIndexRoute
   '/_auth/admin/notes/$noteId': typeof AuthAdminNotesNoteIdRoute
@@ -74,16 +83,24 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/notes/$noteId'
     | '/shared/$token'
     | '/admin/'
     | '/admin/notes/$noteId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/shared/$token' | '/admin' | '/admin/notes/$noteId'
+  to:
+    | '/'
+    | '/login'
+    | '/notes/$noteId'
+    | '/shared/$token'
+    | '/admin'
+    | '/admin/notes/$noteId'
   id:
     | '__root__'
     | '/'
     | '/_auth'
     | '/login'
+    | '/notes/$noteId'
     | '/shared/$token'
     | '/_auth/admin/'
     | '/_auth/admin/notes/$noteId'
@@ -93,6 +110,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRouteWithChildren
   LoginRoute: typeof LoginRoute
+  NotesNoteIdRoute: typeof NotesNoteIdRoute
   SharedTokenRoute: typeof SharedTokenRoute
 }
 
@@ -124,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/shared/$token'
       fullPath: '/shared/$token'
       preLoaderRoute: typeof SharedTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notes/$noteId': {
+      id: '/notes/$noteId'
+      path: '/notes/$noteId'
+      fullPath: '/notes/$noteId'
+      preLoaderRoute: typeof NotesNoteIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_auth/admin/': {
@@ -159,6 +184,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRouteWithChildren,
   LoginRoute: LoginRoute,
+  NotesNoteIdRoute: NotesNoteIdRoute,
   SharedTokenRoute: SharedTokenRoute,
 }
 export const routeTree = rootRouteImport

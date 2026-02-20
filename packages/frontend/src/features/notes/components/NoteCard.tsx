@@ -5,9 +5,10 @@ import type { Note } from '../hooks/use-notes';
 
 interface NoteCardProps {
     note: Note;
+    publicRoute?: boolean;
 }
 
-export function NoteCard({ note }: NoteCardProps) {
+export function NoteCard({ note, publicRoute = false }: NoteCardProps) {
     // Determine icon based on visibility
     const VisibilityIcon = {
         private: Lock,
@@ -15,12 +16,8 @@ export function NoteCard({ note }: NoteCardProps) {
         shared: Share2,
     }[note.visibility];
 
-    return (
-        <Link
-            to='/admin/notes/$noteId'
-            params={{ noteId: note.id }}
-            className='group relative flex flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:scale-[1.02] hover:shadow-md hover:-translate-y-1 active:scale-[0.98] active:translate-y-0'
-        >
+    const innerContent = (
+        <>
             {/* Cover Image Area */}
             <div className='relative h-32 w-full overflow-hidden bg-muted'>
                 {note.coverImage ? (
@@ -59,8 +56,31 @@ export function NoteCard({ note }: NoteCardProps) {
                     </time>
                 </div>
             </div>
+        </>
+    );
 
-            {/* Ambient Shadow/Glow effect on hover (optional enhancement via CSS or keeping simple Tailwind) */}
+    const className =
+        'group relative flex flex-col overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm transition-all hover:scale-[1.02] hover:shadow-md hover:-translate-y-1 active:scale-[0.98] active:translate-y-0';
+
+    if (publicRoute) {
+        return (
+            <Link
+                to='/notes/$noteId'
+                params={{ noteId: note.id }}
+                className={className}
+            >
+                {innerContent}
+            </Link>
+        );
+    }
+
+    return (
+        <Link
+            to='/admin/notes/$noteId'
+            params={{ noteId: note.id }}
+            className={className}
+        >
+            {innerContent}
         </Link>
     );
 }
