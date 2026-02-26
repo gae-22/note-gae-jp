@@ -5,6 +5,7 @@ import { api } from '@/lib/api-client';
 import { useAuth } from '@/hooks/use-auth';
 import { EditorPane } from './editor-pane';
 import { PreviewPane } from './preview-pane';
+import { NoteSettingsPanel } from '../settings/note-settings-panel';
 import type { NoteListItem } from '@note-gae/shared';
 import {
   LuDiamond,
@@ -15,6 +16,9 @@ import {
   LuCheck,
   LuLoader,
   LuCircleDot,
+  LuSettings,
+  LuTrash2,
+  LuDownload,
 } from 'react-icons/lu';
 
 type ViewMode = 'editor' | 'preview' | 'split';
@@ -28,6 +32,7 @@ export function EditorPage() {
   const [content, setContent] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  const [showSettings, setShowSettings] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialized = useRef(false);
 
@@ -52,12 +57,25 @@ export function EditorPage() {
   }, [noteData]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: { title?: string; content?: string }) => api.patch(`/notes/${noteId}`, data),
+    mutationFn: (data: {
+      title?: string;
+      content?: string;
+      isPublic?: boolean;
+      tagIds?: string[];
+    }) => api.patch(`/notes/${noteId}`, data),
     onSuccess: () => {
       setSaveStatus('saved');
       queryClient.invalidateQueries({ queryKey: ['notes'] });
     },
     onError: () => setSaveStatus('unsaved'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/notes/${noteId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      navigate({ to: '/dashboard' });
+    },
   });
 
   const debouncedSave = useCallback(
@@ -88,6 +106,16 @@ export function EditorPage() {
     saveMutation.mutate({ title, content });
   };
 
+  const handleExportMd = () => {
+    const blob = new Blob([`# ${title}\n\n${content}`], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title || 'untitled'}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 's') {
@@ -113,6 +141,7 @@ export function EditorPage() {
 
   const wordCount = content.split(/\s+/).filter(Boolean).length;
   const lineCount = content.split('\n').length;
+  const charCount = content.length;
 
   return (
     <div className="bg-void-900 flex min-h-screen flex-col">
@@ -135,27 +164,21 @@ export function EditorPage() {
 
         {/* View mode */}
         <div className="bg-void-700 flex items-center rounded-md p-0.5">
-          <button
-            onClick={() => setViewMode('editor')}
-            className={`rounded p-1.5 ${viewMode === 'editor' ? 'bg-void-600 text-accent-500' : 'text-void-300 hover:text-void-100'} transition-colors`}
-            title="Editor (⌘1)"
-          >
-            <LuCode size={16} />
-          </button>
-          <button
-            onClick={() => setViewMode('preview')}
-            className={`rounded p-1.5 ${viewMode === 'preview' ? 'bg-void-600 text-accent-500' : 'text-void-300 hover:text-void-100'} transition-colors`}
-            title="Preview (⌘2)"
-          >
-            <LuEye size={16} />
-          </button>
-          <button
-            onClick={() => setViewMode('split')}
-            className={`rounded p-1.5 ${viewMode === 'split' ? 'bg-void-600 text-accent-500' : 'text-void-300 hover:text-void-100'} transition-colors`}
-            title="Split (⌘3)"
-          >
-            <LuColumns2 size={16} />
-          </button>
+          {(['editor', 'preview', 'split'] as const).map((mode, i) => {
+            const icons = [LuCode, LuEye, LuColumns2];
+            const labels = ['Editor (⌘1)', 'Preview (⌘2)', 'Split (⌘3)'];
+            const Icon = icons[i];
+            return (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                className={`rounded p-1.5 transition-colors ${viewMode === mode ? 'bg-void-600 text-accent-500' : 'text-void-300 hover:text-void-100'}`}
+                title={labels[i]}
+              >
+                <Icon size={16} />
+              </button>
+            );
+          })}
         </div>
 
         {/* Save status */}
@@ -178,6 +201,30 @@ export function EditorPage() {
               <span className="text-warning">Unsaved</span>
             </>
           )}
+        </div>
+
+        <div className="ml-2 flex items-center gap-1">
+          <button
+            onClick={handleExportMd}
+            className="text-void-300 hover:bg-void-700 hover:text-void-100 rounded p-1.5 transition-colors"
+            title="Export Markdown"
+          >
+            <LuDownload size={16} />
+          </button>
+          <button
+            onClick={() => deleteMutation.mutate()}
+            className="text-void-300 hover:bg-void-700 hover:text-error rounded p-1.5 transition-colors"
+            title="Delete Note"
+          >
+            <LuTrash2 size={16} />
+          </button>
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className={`rounded p-1.5 transition-colors ${showSettings ? 'bg-void-600 text-accent-500' : 'text-void-300 hover:bg-void-700 hover:text-void-100'}`}
+            title="Settings"
+          >
+            <LuSettings size={16} />
+          </button>
         </div>
       </header>
 
@@ -212,10 +259,31 @@ export function EditorPage() {
       {/* Status bar */}
       <footer className="border-glass-border bg-void-800 text-void-300 flex h-6 shrink-0 items-center gap-4 border-t px-4 text-xs">
         <span>Ln {lineCount}</span>
+        <span>Col {charCount > 0 ? content.split('\n').pop()!.length + 1 : 1}</span>
         <span>Words: {wordCount}</span>
+        <span>Chars: {charCount}</span>
         <span>Markdown</span>
         <span>UTF-8</span>
+        {noteData?.note?.isPublic !== undefined && (
+          <span className="ml-auto">{noteData.note.isPublic ? '🌐 Public' : '🔒 Private'}</span>
+        )}
       </footer>
+
+      {/* Settings Panel */}
+      {showSettings && noteData?.note && (
+        <NoteSettingsPanel
+          noteId={noteId}
+          isPublic={noteData.note.isPublic}
+          noteTags={noteData.note.tags}
+          onTogglePublic={(pub) => {
+            saveMutation.mutate({ isPublic: pub });
+          }}
+          onUpdateTags={(tagIds) => {
+            saveMutation.mutate({ tagIds });
+          }}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }

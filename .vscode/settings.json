@@ -1,5 +1,6 @@
 {
   "files.associations": {
     "global.css": "tailwindcss"
-  }
+  },
+  "tailwindCSS.lint.suggestCanonicalClasses": "warning"
 }
