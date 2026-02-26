@@ -1,6 +1,22 @@
-node_modules
-dist
+# ── Dependencies ──
+node_modules/
+
+# ── Build ──
+dist/
+
+# ── Lock files ──
 bun.lock
+package-lock.json
+
+# ── Database ──
 *.db
-data
-packages/backend/src/db/migrations
+*.db-journal
+*.db-wal
+*.db-shm
+**/data/
+
+# ── Generated (Drizzle migrations) ──
+packages/backend/src/db/migrations/
+
+# ── Docs (Markdown formatted separately) ──
+docs/

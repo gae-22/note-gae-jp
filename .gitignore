@@ -1,9 +1,36 @@
+# ── Dependencies ──
 node_modules/
+
+# ── Build ──
 dist/
+*.tsbuildinfo
+
+# ── Environment ──
 .env
+.env.local
+.env.*.local
+
+# ── Database (SQLite) ──
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
-data/
+**/data/
+
+# ── OS ──
 .DS_Store
+Thumbs.db
+
+# ── IDE ──
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Logs ──
+*.log
+npm-debug.log*
+
+# ── Temporary ──
+tmp/
+.tmp/
