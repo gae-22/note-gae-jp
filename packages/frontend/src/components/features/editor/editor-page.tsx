@@ -3,6 +3,8 @@ import { useParams, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { useAuth } from '@/hooks/use-auth';
+import { EditorPane } from './editor-pane';
+import { PreviewPane } from './preview-pane';
 import type { NoteListItem } from '@note-gae/shared';
 import {
   LuDiamond,
@@ -11,10 +13,8 @@ import {
   LuEye,
   LuColumns2,
   LuCheck,
-  LuLoader2,
+  LuLoader,
   LuCircleDot,
-  LuSettings,
-  LuMoreHorizontal,
 } from 'react-icons/lu';
 
 type ViewMode = 'editor' | 'preview' | 'split';
@@ -28,7 +28,7 @@ export function EditorPage() {
   const [content, setContent] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('split');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-  const saveTimer = useRef<Timer | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -43,7 +43,6 @@ export function EditorPage() {
     enabled: isAuthenticated,
   });
 
-  // Initialize editor content
   useEffect(() => {
     if (noteData?.note && !initialized.current) {
       setTitle(noteData.note.title);
@@ -118,7 +117,7 @@ export function EditorPage() {
   return (
     <div className="bg-void-900 flex min-h-screen flex-col">
       {/* Toolbar */}
-      <header className="bg-void-800 flex h-12 shrink-0 items-center gap-3 border-b border-[rgba(255,255,255,0.06)] px-4">
+      <header className="border-glass-border bg-void-800 flex h-12 shrink-0 items-center gap-3 border-b px-4">
         <div className="flex items-center gap-2">
           <LuDiamond className="text-accent-500" size={18} />
           <span className="font-heading text-void-50 text-sm font-bold">note.gae</span>
@@ -134,7 +133,7 @@ export function EditorPage() {
 
         <div className="flex-1" />
 
-        {/* View mode buttons */}
+        {/* View mode */}
         <div className="bg-void-700 flex items-center rounded-md p-0.5">
           <button
             onClick={() => setViewMode('editor')}
@@ -169,7 +168,7 @@ export function EditorPage() {
           )}
           {saveStatus === 'saving' && (
             <>
-              <LuLoader2 size={14} className="text-void-200 animate-spin" />
+              <LuLoader size={14} className="text-void-200 animate-spin" />
               <span className="text-void-200">Saving...</span>
             </>
           )}
@@ -182,8 +181,8 @@ export function EditorPage() {
         </div>
       </header>
 
-      {/* Title input */}
-      <div className="bg-void-900 border-b border-[rgba(255,255,255,0.06)] px-6 py-3">
+      {/* Title */}
+      <div className="border-glass-border bg-void-900 border-b px-6 py-3">
         <input
           type="text"
           value={title}
@@ -197,36 +196,21 @@ export function EditorPage() {
       <div className="flex flex-1 overflow-hidden">
         {(viewMode === 'editor' || viewMode === 'split') && (
           <div
-            className={`${viewMode === 'split' ? 'w-1/2 border-r border-[rgba(255,255,255,0.06)]' : 'w-full'} flex flex-col`}
+            className={`${viewMode === 'split' ? 'border-glass-border w-1/2 border-r' : 'w-full'} flex flex-col`}
           >
-            <textarea
-              value={content}
-              onChange={(e) => handleContentChange(e.target.value)}
-              className="bg-void-950 text-void-50 placeholder:text-void-400 w-full flex-1 resize-none p-6 font-mono text-sm leading-7 focus:outline-none"
-              placeholder="Start writing in Markdown..."
-              spellCheck={false}
-            />
+            <EditorPane value={content} onChange={handleContentChange} />
           </div>
         )}
 
         {(viewMode === 'preview' || viewMode === 'split') && (
-          <div
-            className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-void-900 overflow-auto p-6`}
-          >
-            <div className="prose prose-invert text-void-50 max-w-none">
-              {/* Simple preview — will enhance with unified pipeline */}
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: simpleMarkdownToHtml(content),
-                }}
-              />
-            </div>
+          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+            <PreviewPane content={content} />
           </div>
         )}
       </div>
 
       {/* Status bar */}
-      <footer className="bg-void-800 text-void-300 flex h-6 items-center gap-4 border-t border-[rgba(255,255,255,0.06)] px-4 text-xs">
+      <footer className="border-glass-border bg-void-800 text-void-300 flex h-6 shrink-0 items-center gap-4 border-t px-4 text-xs">
         <span>Ln {lineCount}</span>
         <span>Words: {wordCount}</span>
         <span>Markdown</span>
@@ -234,23 +218,4 @@ export function EditorPage() {
       </footer>
     </div>
   );
-}
-
-// Simple markdown preview (will be replaced with unified pipeline)
-function simpleMarkdownToHtml(md: string): string {
-  return md
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(
-      /`(.+?)`/g,
-      '<code style="background:var(--color-void-700);padding:2px 6px;border-radius:4px;">$1</code>',
-    )
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/\n/g, '<br />');
 }

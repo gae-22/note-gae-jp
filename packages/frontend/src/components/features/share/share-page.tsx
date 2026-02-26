@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api-client';
 import type { NoteListItem, Comment } from '@note-gae/shared';
-import { LuDiamond, LuMessageSquare, LuClock, LuSend } from 'react-icons/lu';
+import { renderMarkdown } from '@/lib/markdown';
+import { LuDiamond, LuMessageSquare, LuSend } from 'react-icons/lu';
 
 export function SharePage() {
   const { token } = useParams({ from: '/s/$token' });
@@ -11,23 +11,24 @@ export function SharePage() {
   const queryClient = useQueryClient();
   const [authorName, setAuthorName] = useState('');
   const [commentBody, setCommentBody] = useState('');
+  const [previewHtml, setPreviewHtml] = useState('');
 
   const { data: noteData, isError } = useQuery({
     queryKey: ['share', token],
     queryFn: async () => {
-      const noteRes = await fetch(`/api/notes?token=${token}`, {
-        credentials: 'include',
-      });
-      const noteJson = await noteRes.json();
-      if (!noteJson.success) throw new Error(noteJson.error);
+      const res = await fetch(`/api/notes?token=${token}`, { credentials: 'include' });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error);
 
-      // Get note ID from token context — try to get the note details
-      const res = await fetch(`/api/notes/${noteJson.data?.notes?.[0]?.id}?token=${token}`, {
+      const noteId = json.data?.notes?.[0]?.id;
+      if (!noteId) throw new Error('Note not found');
+
+      const noteRes = await fetch(`/api/notes/${noteId}?token=${token}`, {
         credentials: 'include',
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      return data.data as { note: NoteListItem };
+      const noteData = await noteRes.json();
+      if (!noteData.success) throw new Error(noteData.error);
+      return noteData.data as { note: NoteListItem };
     },
     retry: false,
   });
@@ -35,13 +36,18 @@ export function SharePage() {
   const { data: commentsData } = useQuery({
     queryKey: ['comments', noteData?.note?.id],
     queryFn: () =>
-      fetch(`/api/comments/note/${noteData!.note.id}?token=${token}`, {
-        credentials: 'include',
-      })
+      fetch(`/api/comments/note/${noteData!.note.id}?token=${token}`, { credentials: 'include' })
         .then((r) => r.json())
         .then((d) => d.data as { comments: Comment[] }),
     enabled: !!noteData?.note?.id,
   });
+
+  // Render markdown
+  useEffect(() => {
+    if (noteData?.note?.content) {
+      renderMarkdown(noteData.note.content).then(setPreviewHtml);
+    }
+  }, [noteData?.note?.content]);
 
   const addComment = useMutation({
     mutationFn: async () => {
@@ -55,9 +61,7 @@ export function SharePage() {
     },
     onSuccess: () => {
       setCommentBody('');
-      queryClient.invalidateQueries({
-        queryKey: ['comments', noteData?.note?.id],
-      });
+      queryClient.invalidateQueries({ queryKey: ['comments', noteData?.note?.id] });
     },
   });
 
@@ -79,8 +83,7 @@ export function SharePage() {
 
   return (
     <div className="bg-void-900 min-h-screen">
-      {/* Header */}
-      <header className="bg-void-800 flex h-12 items-center border-b border-[rgba(255,255,255,0.06)] px-6">
+      <header className="border-glass-border bg-void-800 flex h-12 items-center border-b px-6">
         <div className="flex items-center gap-2">
           <LuDiamond className="text-accent-500" size={18} />
           <span className="font-heading text-void-50 text-sm font-bold">note.gae</span>
@@ -88,7 +91,6 @@ export function SharePage() {
         <span className="text-void-300 ml-auto text-xs">Shared with you</span>
       </header>
 
-      {/* Content */}
       <main className="mx-auto max-w-3xl px-6 py-10">
         <h1 className="font-heading text-void-50 mb-3 text-2xl font-bold">
           {note.title || 'Untitled'}
@@ -109,17 +111,12 @@ export function SharePage() {
 
         <p className="text-void-300 mb-8 text-xs">Shared by gae</p>
 
-        {/* Rendered note content */}
-        <div className="prose prose-invert max-w-none border-t border-[rgba(255,255,255,0.06)] pt-8">
-          <div
-            dangerouslySetInnerHTML={{
-              __html: simpleMarkdownToHtml(note.content),
-            }}
-          />
+        <div className="prose-void border-glass-border border-t pt-8">
+          <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
         </div>
 
         {/* Comments */}
-        <div className="mt-12 border-t border-[rgba(255,255,255,0.06)] pt-8">
+        <div className="border-glass-border mt-12 border-t pt-8">
           <h2 className="font-heading text-void-50 mb-6 flex items-center gap-2 text-lg font-semibold">
             <LuMessageSquare size={18} />
             Comments ({comments_.length})
@@ -139,21 +136,20 @@ export function SharePage() {
             ))}
           </div>
 
-          {/* Comment form */}
           <div className="bg-void-700 space-y-3 rounded-lg p-4">
             <input
               type="text"
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
               placeholder="Your Name"
-              className="bg-void-600 text-void-50 placeholder:text-void-300 focus:border-accent-500 w-full rounded-md border border-[rgba(255,255,255,0.06)] px-3 py-2 text-sm transition-colors focus:outline-none"
+              className="border-glass-border bg-void-600 text-void-50 placeholder:text-void-300 focus:border-accent-500 w-full rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none"
             />
             <textarea
               value={commentBody}
               onChange={(e) => setCommentBody(e.target.value)}
               placeholder="Write a comment..."
               rows={3}
-              className="bg-void-600 text-void-50 placeholder:text-void-300 focus:border-accent-500 w-full resize-none rounded-md border border-[rgba(255,255,255,0.06)] px-3 py-2 text-sm transition-colors focus:outline-none"
+              className="border-glass-border bg-void-600 text-void-50 placeholder:text-void-300 focus:border-accent-500 w-full resize-none rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none"
             />
             <div className="flex justify-end">
               <button
@@ -172,22 +168,4 @@ export function SharePage() {
       </main>
     </div>
   );
-}
-
-function simpleMarkdownToHtml(md: string): string {
-  return md
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(
-      /`(.+?)`/g,
-      '<code style="background:var(--color-void-700);padding:2px 6px;border-radius:4px;">$1</code>',
-    )
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/\n/g, '<br />');
 }

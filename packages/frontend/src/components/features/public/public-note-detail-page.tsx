@@ -1,17 +1,26 @@
+import { useState, useEffect } from 'react';
 import { useParams } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
+import { renderMarkdown } from '@/lib/markdown';
 import { Link } from '@tanstack/react-router';
 import type { NoteListItem } from '@note-gae/shared';
 import { LuDiamond, LuArrowLeft } from 'react-icons/lu';
 
 export function PublicNoteDetailPage() {
   const { noteId } = useParams({ from: '/notes/$noteId' });
+  const [previewHtml, setPreviewHtml] = useState('');
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['public', 'notes', noteId],
     queryFn: () => api.get<{ note: NoteListItem }>(`/public/notes/${noteId}`),
   });
+
+  useEffect(() => {
+    if (data?.note?.content) {
+      renderMarkdown(data.note.content).then(setPreviewHtml);
+    }
+  }, [data?.note?.content]);
 
   if (isLoading) {
     return (
@@ -33,7 +42,7 @@ export function PublicNoteDetailPage() {
 
   return (
     <div className="bg-void-900 min-h-screen">
-      <header className="bg-void-800 flex h-12 items-center border-b border-[rgba(255,255,255,0.06)] px-6">
+      <header className="border-glass-border bg-void-800 flex h-12 items-center border-b px-6">
         <div className="flex items-center gap-2">
           <LuDiamond className="text-accent-500" size={18} />
           <span className="font-heading text-void-50 text-sm font-bold">note.gae</span>
@@ -71,34 +80,12 @@ export function PublicNoteDetailPage() {
           {new Date(note.updatedAt).toLocaleDateString()}
         </p>
 
-        <div className="prose prose-invert max-w-none border-t border-[rgba(255,255,255,0.06)] pt-8">
-          <div
-            dangerouslySetInnerHTML={{
-              __html: simpleMarkdownToHtml(note.content),
-            }}
-          />
+        <div className="prose-void border-glass-border border-t pt-8">
+          <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
         </div>
 
         <footer className="text-void-300 mt-12 text-center text-xs">© 2026 gae</footer>
       </main>
     </div>
   );
-}
-
-function simpleMarkdownToHtml(md: string): string {
-  return md
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(
-      /`(.+?)`/g,
-      '<code style="background:var(--color-void-700);padding:2px 6px;border-radius:4px;">$1</code>',
-    )
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/\n/g, '<br />');
 }
