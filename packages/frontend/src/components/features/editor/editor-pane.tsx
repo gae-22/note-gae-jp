@@ -75,7 +75,7 @@ export function EditorPane({ value, onChange }: EditorPaneProps) {
   return (
     <div
       ref={containerRef}
-      className="bg-void-950 h-full overflow-auto [&_.cm-editor]:h-full [&_.cm-scroller]:overflow-auto!"
+      className="h-full overflow-auto [&_.cm-editor]:h-full [&_.cm-scroller]:overflow-auto! text-[15px] sm:text-base leading-relaxed tracking-wide"
     />
   );
 }

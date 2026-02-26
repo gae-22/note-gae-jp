@@ -8,7 +8,6 @@ import { PreviewPane } from './preview-pane';
 import { NoteSettingsPanel } from '../settings/note-settings-panel';
 import type { NoteListItem } from '@note-gae/shared';
 import {
-  LuDiamond,
   LuArrowLeft,
   LuCode,
   LuEye,
@@ -144,129 +143,145 @@ export function EditorPage() {
   const charCount = content.length;
 
   return (
-    <div className="bg-void-900 flex min-h-screen flex-col">
+    <div className="bg-zinc-50 dark:bg-zinc-950 flex min-h-screen flex-col font-body transition-colors duration-300">
       {/* Toolbar */}
-      <header className="border-glass-border bg-void-800 flex h-12 shrink-0 items-center gap-3 border-b px-4">
-        <div className="flex items-center gap-2">
-          <LuDiamond className="text-accent-500" size={18} />
-          <span className="font-heading text-void-50 text-sm font-bold">note.gae</span>
+      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex h-14 shrink-0 items-center justify-between px-4 sm:px-6 shadow-sm z-10 transition-colors">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => navigate({ to: '/dashboard' })}
+            className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 flex items-center gap-2 text-sm font-medium transition-colors"
+          >
+            <LuArrowLeft size={16} />
+            <span className="hidden sm:inline">Dashboard</span>
+          </button>
+          <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800" />
+
+          {/* Save status */}
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {saveStatus === 'saved' && (
+              <>
+                <LuCheck size={16} className="text-emerald-500" />
+                <span className="text-emerald-600 dark:text-emerald-400">Saved</span>
+              </>
+            )}
+            {saveStatus === 'saving' && (
+              <>
+                <LuLoader size={16} className="text-zinc-400 animate-spin" />
+                <span className="text-zinc-500 dark:text-zinc-400">Saving...</span>
+              </>
+            )}
+            {saveStatus === 'unsaved' && (
+              <>
+                <LuCircleDot size={16} className="text-amber-500" />
+                <span className="text-amber-600 dark:text-amber-400">Unsaved</span>
+              </>
+            )}
+          </div>
         </div>
 
-        <button
-          onClick={() => navigate({ to: '/dashboard' })}
-          className="text-void-200 hover:text-void-50 flex items-center gap-1 text-sm transition-colors"
-        >
-          <LuArrowLeft size={14} />
-          Dashboard
-        </button>
+        <div className="flex items-center gap-4">
+          {/* View mode */}
+          <div className="bg-zinc-100 dark:bg-zinc-800/50 flex items-center rounded-lg p-1 border border-zinc-200 dark:border-zinc-700/50">
+            {(['editor', 'preview', 'split'] as const).map((mode, i) => {
+              const icons = [LuCode, LuEye, LuColumns2];
+              const labels = ['Editor (⌘1)', 'Preview (⌘2)', 'Split (⌘3)'];
+              const Icon = icons[i];
+              return (
+                <button
+                  key={mode}
+                  onClick={() => setViewMode(mode)}
+                  className={`rounded-md p-2 transition-all ${
+                    viewMode === mode
+                      ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-400 shadow-xs ring-1 ring-zinc-200 dark:ring-zinc-600'
+                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                  }`}
+                  title={labels[i]}
+                >
+                  <Icon size={16} />
+                </button>
+              );
+            })}
+          </div>
 
-        <div className="flex-1" />
+          <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
 
-        {/* View mode */}
-        <div className="bg-void-700 flex items-center rounded-md p-0.5">
-          {(['editor', 'preview', 'split'] as const).map((mode, i) => {
-            const icons = [LuCode, LuEye, LuColumns2];
-            const labels = ['Editor (⌘1)', 'Preview (⌘2)', 'Split (⌘3)'];
-            const Icon = icons[i];
-            return (
-              <button
-                key={mode}
-                onClick={() => setViewMode(mode)}
-                className={`rounded p-1.5 transition-colors ${viewMode === mode ? 'bg-void-600 text-accent-500' : 'text-void-300 hover:text-void-100'}`}
-                title={labels[i]}
-              >
-                <Icon size={16} />
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Save status */}
-        <div className="flex items-center gap-1.5 text-sm">
-          {saveStatus === 'saved' && (
-            <>
-              <LuCheck size={14} className="text-success" />
-              <span className="text-success">Saved</span>
-            </>
-          )}
-          {saveStatus === 'saving' && (
-            <>
-              <LuLoader size={14} className="text-void-200 animate-spin" />
-              <span className="text-void-200">Saving...</span>
-            </>
-          )}
-          {saveStatus === 'unsaved' && (
-            <>
-              <LuCircleDot size={14} className="text-warning" />
-              <span className="text-warning">Unsaved</span>
-            </>
-          )}
-        </div>
-
-        <div className="ml-2 flex items-center gap-1">
-          <button
-            onClick={handleExportMd}
-            className="text-void-300 hover:bg-void-700 hover:text-void-100 rounded p-1.5 transition-colors"
-            title="Export Markdown"
-          >
-            <LuDownload size={16} />
-          </button>
-          <button
-            onClick={() => deleteMutation.mutate()}
-            className="text-void-300 hover:bg-void-700 hover:text-error rounded p-1.5 transition-colors"
-            title="Delete Note"
-          >
-            <LuTrash2 size={16} />
-          </button>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`rounded p-1.5 transition-colors ${showSettings ? 'bg-void-600 text-accent-500' : 'text-void-300 hover:bg-void-700 hover:text-void-100'}`}
-            title="Settings"
-          >
-            <LuSettings size={16} />
-          </button>
+          <div className="flex items-center gap-1.5 sm:flex">
+            <button
+              onClick={handleExportMd}
+              className="text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 rounded-md p-2 transition-colors"
+              title="Export Markdown"
+            >
+              <LuDownload size={18} />
+            </button>
+            <button
+              onClick={() => {
+                if (confirm('Are you sure you want to delete this document?')) deleteMutation.mutate();
+              }}
+              className="text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-red-900/20 dark:hover:text-red-400 rounded-md p-2 transition-colors"
+              title="Delete Note"
+            >
+              <LuTrash2 size={18} />
+            </button>
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`rounded-md p-2 transition-colors ${
+                showSettings
+                  ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400'
+                  : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+              }`}
+              title="Settings"
+            >
+              <LuSettings size={18} />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Title */}
-      <div className="border-glass-border bg-void-900 border-b px-6 py-3">
+      <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 py-4 shadow-sm z-10 transition-colors">
         <input
           type="text"
           value={title}
           onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="Untitled"
-          className="font-heading text-void-50 placeholder:text-void-400 w-full bg-transparent text-2xl font-bold focus:outline-none"
+          placeholder="Document Title..."
+          className="font-heading text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 w-full bg-transparent text-3xl sm:text-4xl font-bold focus:outline-none"
         />
       </div>
 
       {/* Editor + Preview */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
         {(viewMode === 'editor' || viewMode === 'split') && (
           <div
-            className={`${viewMode === 'split' ? 'border-glass-border w-1/2 border-r' : 'w-full'} flex flex-col`}
+            className={`${viewMode === 'split' ? 'border-r border-zinc-200 dark:border-zinc-800 w-1/2' : 'w-full'} flex flex-col bg-white dark:bg-zinc-950 transition-colors`}
           >
             <EditorPane value={content} onChange={handleContentChange} />
           </div>
         )}
 
         {(viewMode === 'preview' || viewMode === 'split') && (
-          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
-            <PreviewPane content={content} />
+          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-zinc-50 dark:bg-zinc-900/50 transition-colors overflow-y-auto`}>
+            <div className="max-w-4xl mx-auto p-8 sm:p-12">
+              <PreviewPane content={content} />
+            </div>
           </div>
         )}
       </div>
 
       {/* Status bar */}
-      <footer className="border-glass-border bg-void-800 text-void-300 flex h-6 shrink-0 items-center gap-4 border-t px-4 text-xs">
-        <span>Ln {lineCount}</span>
-        <span>Col {charCount > 0 ? content.split('\n').pop()!.length + 1 : 1}</span>
-        <span>Words: {wordCount}</span>
-        <span>Chars: {charCount}</span>
-        <span>Markdown</span>
-        <span>UTF-8</span>
-        {noteData?.note?.isPublic !== undefined && (
-          <span className="ml-auto">{noteData.note.isPublic ? '🌐 Public' : '🔒 Private'}</span>
-        )}
+      <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 flex h-8 shrink-0 items-center justify-between px-4 text-xs font-mono transition-colors">
+        <div className="flex items-center gap-6">
+          <span>{lineCount} lines</span>
+          <span className="hidden sm:inline">{wordCount} words</span>
+          <span className="hidden sm:inline">{charCount} chars</span>
+        </div>
+        <div className="flex items-center justify-end gap-6 text-right w-full sm:w-auto">
+          {noteData?.note?.isPublic !== undefined && (
+            <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+              {noteData.note.isPublic ? '🌐 Public Document' : '🔒 Private Document'}
+            </span>
+          )}
+          <span className="hidden sm:inline">Markdown</span>
+        </div>
       </footer>
 
       {/* Settings Panel */}

@@ -23,7 +23,7 @@ export function PreviewPane({ content }: PreviewPaneProps) {
   }, [content]);
 
   return (
-    <div className="bg-void-900 h-full overflow-auto p-6">
+    <div className="h-full overflow-visible">
       <div className="prose-void max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
