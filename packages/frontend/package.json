@@ -1,0 +1,40 @@
+{
+    "name": "@note-gae/frontend",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc -b && vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@note-gae/shared": "workspace:*",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "@tanstack/react-router": "^1",
+        "@tanstack/react-query": "^5",
+        "react-icons": "^5",
+        "@codemirror/lang-markdown": "^6",
+        "@codemirror/state": "^6",
+        "@codemirror/view": "^6",
+        "codemirror": "^6",
+        "unified": "^11",
+        "remark-parse": "^11",
+        "remark-gfm": "^4",
+        "remark-rehype": "^11",
+        "rehype-sanitize": "^6",
+        "rehype-highlight": "^7",
+        "rehype-stringify": "^10",
+        "rehype-react": "^8"
+    },
+    "devDependencies": {
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "@vitejs/plugin-react": "^4",
+        "vite": "^6",
+        "tailwindcss": "^4",
+        "@tailwindcss/vite": "^4",
+        "typescript": "^5.7"
+    }
+}
