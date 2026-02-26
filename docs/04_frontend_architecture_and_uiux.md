@@ -71,31 +71,31 @@ gae-jp.net の "Void Kinetic 2026" コンセプトを継承し、メモアプリ
 
 ```css
 @theme {
-    /* ── Void（基盤色） ── */
-    --color-void-950: #050505; /* 最深部。エディタ背景 */
-    --color-void-900: #0a0a0a; /* gae-jp.net ベース背景 */
-    --color-void-800: #111111; /* サイドバー背景 */
-    --color-void-700: #1a1a1a; /* カード・パネル背景 */
-    --color-void-600: #222222; /* ドロップダウン・ホバー */
-    --color-void-500: #2a2a2a; /* ボーダー（微細） */
-    --color-void-400: #3a3a3a; /* ボーダー（強調） */
-    --color-void-300: #555555; /* ミュートテキスト */
-    --color-void-200: #888888; /* セカンダリテキスト */
-    --color-void-100: #bbbbbb; /* サブテキスト */
-    --color-void-50: #e0e0e0; /* プライマリテキスト */
+  /* ── Void（基盤色） ── */
+  --color-void-950: #050505; /* 最深部。エディタ背景 */
+  --color-void-900: #0a0a0a; /* gae-jp.net ベース背景 */
+  --color-void-800: #111111; /* サイドバー背景 */
+  --color-void-700: #1a1a1a; /* カード・パネル背景 */
+  --color-void-600: #222222; /* ドロップダウン・ホバー */
+  --color-void-500: #2a2a2a; /* ボーダー（微細） */
+  --color-void-400: #3a3a3a; /* ボーダー（強調） */
+  --color-void-300: #555555; /* ミュートテキスト */
+  --color-void-200: #888888; /* セカンダリテキスト */
+  --color-void-100: #bbbbbb; /* サブテキスト */
+  --color-void-50: #e0e0e0; /* プライマリテキスト */
 
-    /* ── Accent（アクセント） ── */
-    --color-accent-500: #c8ff00; /* gae-jp.net アクセント */
-    --color-accent-400: #d4ff33; /* ホバー時 */
-    --color-accent-300: #e0ff66; /* アクティブ時・選択 */
-    --color-accent-600: #a0cc00; /* テキストオンライト */
-    --color-accent-glow: rgba(200, 255, 0, 0.15); /* グロー効果 */
+  /* ── Accent（アクセント） ── */
+  --color-accent-500: #c8ff00; /* gae-jp.net アクセント */
+  --color-accent-400: #d4ff33; /* ホバー時 */
+  --color-accent-300: #e0ff66; /* アクティブ時・選択 */
+  --color-accent-600: #a0cc00; /* テキストオンライト */
+  --color-accent-glow: rgba(200, 255, 0, 0.15); /* グロー効果 */
 
-    /* ── Semantic（意味色） ── */
-    --color-success: #4ade80;
-    --color-warning: #fbbf24;
-    --color-error: #f87171;
-    --color-info: #60a5fa;
+  /* ── Semantic（意味色） ── */
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+  --color-info: #60a5fa;
 }
 ```
 
@@ -103,24 +103,24 @@ gae-jp.net の "Void Kinetic 2026" コンセプトを継承し、メモアプリ
 
 ```css
 @media (prefers-color-scheme: light) {
-    :root {
-        --color-void-950: #ffffff;
-        --color-void-900: #fafafa;
-        --color-void-800: #f5f5f5;
-        --color-void-700: #eeeeee;
-        --color-void-600: #e5e5e5;
-        --color-void-500: #d4d4d4;
-        --color-void-400: #a3a3a3;
-        --color-void-300: #737373;
-        --color-void-200: #525252;
-        --color-void-100: #404040;
-        --color-void-50: #171717;
+  :root {
+    --color-void-950: #ffffff;
+    --color-void-900: #fafafa;
+    --color-void-800: #f5f5f5;
+    --color-void-700: #eeeeee;
+    --color-void-600: #e5e5e5;
+    --color-void-500: #d4d4d4;
+    --color-void-400: #a3a3a3;
+    --color-void-300: #737373;
+    --color-void-200: #525252;
+    --color-void-100: #404040;
+    --color-void-50: #171717;
 
-        --color-accent-500: #84a600;
-        --color-accent-400: #6d8a00;
-        --color-accent-600: #4a6000;
-        --color-accent-glow: rgba(132, 166, 0, 0.1);
-    }
+    --color-accent-500: #84a600;
+    --color-accent-400: #6d8a00;
+    --color-accent-600: #4a6000;
+    --color-accent-glow: rgba(132, 166, 0, 0.1);
+  }
 }
 ```
 
@@ -130,20 +130,20 @@ gae-jp.net の "Void Kinetic 2026" コンセプトを継承し、メモアプリ
 
 ```css
 @theme {
-    /* ── Font Families ── */
-    --font-heading: 'Outfit', system-ui, sans-serif;
-    --font-body: 'Inter', system-ui, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-    --font-jp: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', sans-serif;
+  /* ── Font Families ── */
+  --font-heading: 'Outfit', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --font-jp: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', sans-serif;
 
-    /* ── Fluid Type Scale (clamp) ── */
-    --text-xs: clamp(0.6875rem, 0.65rem + 0.1vw, 0.75rem); /* 11-12px */
-    --text-sm: clamp(0.75rem, 0.7rem + 0.15vw, 0.875rem); /* 12-14px */
-    --text-base: clamp(0.875rem, 0.825rem + 0.2vw, 1rem); /* 14-16px */
-    --text-lg: clamp(1rem, 0.925rem + 0.3vw, 1.25rem); /* 16-20px */
-    --text-xl: clamp(1.25rem, 1.1rem + 0.5vw, 1.75rem); /* 20-28px */
-    --text-2xl: clamp(1.5rem, 1.3rem + 0.8vw, 2.25rem); /* 24-36px */
-    --text-3xl: clamp(2rem, 1.6rem + 1.2vw, 3rem); /* 32-48px */
+  /* ── Fluid Type Scale (clamp) ── */
+  --text-xs: clamp(0.6875rem, 0.65rem + 0.1vw, 0.75rem); /* 11-12px */
+  --text-sm: clamp(0.75rem, 0.7rem + 0.15vw, 0.875rem); /* 12-14px */
+  --text-base: clamp(0.875rem, 0.825rem + 0.2vw, 1rem); /* 14-16px */
+  --text-lg: clamp(1rem, 0.925rem + 0.3vw, 1.25rem); /* 16-20px */
+  --text-xl: clamp(1.25rem, 1.1rem + 0.5vw, 1.75rem); /* 20-28px */
+  --text-2xl: clamp(1.5rem, 1.3rem + 0.8vw, 2.25rem); /* 24-36px */
+  --text-3xl: clamp(2rem, 1.6rem + 1.2vw, 3rem); /* 32-48px */
 }
 ```
 
@@ -164,25 +164,25 @@ gae-jp.net の "Void Kinetic 2026" コンセプトを継承し、メモアプリ
 
 ```css
 @theme {
-    /* ── 4px Grid System ── */
-    --space-0: 0;
-    --space-1: 0.25rem; /* 4px */
-    --space-2: 0.5rem; /* 8px */
-    --space-3: 0.75rem; /* 12px */
-    --space-4: 1rem; /* 16px */
-    --space-5: 1.25rem; /* 20px */
-    --space-6: 1.5rem; /* 24px */
-    --space-8: 2rem; /* 32px */
-    --space-10: 2.5rem; /* 40px */
-    --space-12: 3rem; /* 48px */
-    --space-16: 4rem; /* 64px */
+  /* ── 4px Grid System ── */
+  --space-0: 0;
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem; /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --space-8: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem; /* 48px */
+  --space-16: 4rem; /* 64px */
 
-    /* ── Border Radius ── */
-    --radius-sm: 0.375rem; /* 6px */
-    --radius-md: 0.5rem; /* 8px */
-    --radius-lg: 0.75rem; /* 12px */
-    --radius-xl: 1rem; /* 16px */
-    --radius-full: 9999px;
+  /* ── Border Radius ── */
+  --radius-sm: 0.375rem; /* 6px */
+  --radius-md: 0.5rem; /* 8px */
+  --radius-lg: 0.75rem; /* 12px */
+  --radius-xl: 1rem; /* 16px */
+  --radius-full: 9999px;
 }
 ```
 
@@ -192,17 +192,17 @@ gae-jp.net の "Void Kinetic 2026" コンセプトを継承し、メモアプリ
 
 ```css
 @theme {
-    /* 深度を意識した微細なシャドウシステム */
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-    --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
-    --shadow-xl: 0 16px 32px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
+  /* 深度を意識した微細なシャドウシステム */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 16px 32px rgba(0, 0, 0, 0.3), 0 4px 8px rgba(0, 0, 0, 0.2);
 
-    /* グラスモーフィズム（現代的解釈：極薄ボーダー＋微細ブラー） */
-    --glass-bg: rgba(17, 17, 17, 0.7);
-    --glass-border: rgba(255, 255, 255, 0.06);
-    --glass-blur: 12px;
+  /* グラスモーフィズム（現代的解釈：極薄ボーダー＋微細ブラー） */
+  --glass-bg: rgba(17, 17, 17, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  --glass-blur: 12px;
 }
 ```
 
@@ -212,16 +212,16 @@ gae-jp.net の "Void Kinetic 2026" コンセプトを継承し、メモアプリ
 
 ```css
 @theme {
-    /* ── Easing ── */
-    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* ── Easing ── */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-    /* ── Duration ── */
-    --duration-fast: 100ms;
-    --duration-normal: 200ms;
-    --duration-slow: 400ms;
-    --duration-reveal: 600ms;
+  /* ── Duration ── */
+  --duration-fast: 100ms;
+  --duration-normal: 200ms;
+  --duration-slow: 400ms;
+  --duration-reveal: 600ms;
 }
 ```
 
@@ -257,11 +257,11 @@ gae-jp.net の "Void Kinetic 2026" コンセプトを継承し、メモアプリ
 ```typescript
 // icon-sizes.ts
 export const ICON_SIZE = {
-    xs: 14, // メタ情報、インラインインジケータ
-    sm: 16, // ボタンアイコン、サイドバー項目
-    md: 20, // ツールバーアイコン、ヘッダーアクション
-    lg: 24, // 空状態アイコン、モーダルヘッダー
-    xl: 32, // ページ中央の状態表示（期限切れ画面等）
+  xs: 14, // メタ情報、インラインインジケータ
+  sm: 16, // ボタンアイコン、サイドバー項目
+  md: 20, // ツールバーアイコン、ヘッダーアクション
+  lg: 24, // 空状態アイコン、モーダルヘッダー
+  xl: 32, // ページ中央の状態表示（期限切れ画面等）
 } as const;
 ```
 

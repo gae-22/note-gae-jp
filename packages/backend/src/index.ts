@@ -15,11 +15,11 @@ const app = new Hono();
 
 // Global middleware
 app.use(
-    '*',
-    cors({
-        origin: env.FRONTEND_URL,
-        credentials: true,
-    }),
+  '*',
+  cors({
+    origin: env.FRONTEND_URL,
+    credentials: true,
+  }),
 );
 app.use('/api/*', authMiddleware());
 
@@ -32,13 +32,11 @@ app.route('/api/comments', commentsRoutes);
 app.route('/api/public', publicRoutes);
 
 // Health check
-app.get('/api/health', (c) =>
-    c.json({ success: true, data: { status: 'ok' } }),
-);
+app.get('/api/health', (c) => c.json({ success: true, data: { status: 'ok' } }));
 
 console.log(`🚀 Backend running on http://localhost:${env.PORT}`);
 
 export default {
-    port: env.PORT,
-    fetch: app.fetch,
+  port: env.PORT,
+  fetch: app.fetch,
 };

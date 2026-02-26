@@ -1,16 +1,22 @@
 {
-    "name": "note-gae-jp",
-    "private": true,
-    "workspaces": [
-        "packages/*"
-    ],
-    "scripts": {
-        "dev": "bun run --filter '*' dev",
-        "dev:backend": "bun run --filter @note-gae/backend dev",
-        "dev:frontend": "bun run --filter @note-gae/frontend dev",
-        "build": "bun run --filter '*' build",
-        "db:generate": "bun run --filter @note-gae/backend db:generate",
-        "db:migrate": "bun run --filter @note-gae/backend db:migrate",
-        "db:seed": "bun run --filter @note-gae/backend db:seed"
-    }
+  "name": "note-gae-jp",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '*' dev",
+    "dev:backend": "bun run --filter @note-gae/backend dev",
+    "dev:frontend": "bun run --filter @note-gae/frontend dev",
+    "build": "bun run --filter '*' build",
+    "db:generate": "bun run --filter @note-gae/backend db:generate",
+    "db:migrate": "bun run --filter @note-gae/backend db:migrate",
+    "db:seed": "bun run --filter @note-gae/backend db:seed",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.8.1",
+    "prettier-plugin-tailwindcss": "^0.7.2"
+  }
 }

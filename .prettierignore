@@ -1,0 +1,6 @@
+node_modules
+dist
+bun.lock
+*.db
+data
+packages/backend/src/db/migrations
