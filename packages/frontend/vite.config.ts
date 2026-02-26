@@ -10,6 +10,31 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          codemirror: [
+            '@codemirror/state',
+            '@codemirror/view',
+            '@codemirror/commands',
+            '@codemirror/language',
+            '@codemirror/lang-markdown',
+          ],
+          markdown: [
+            'unified',
+            'remark-parse',
+            'remark-gfm',
+            'remark-rehype',
+            'rehype-sanitize',
+            'rehype-highlight',
+            'rehype-stringify',
+          ],
+          vendor: ['react', 'react-dom', '@tanstack/react-query', '@tanstack/react-router'],
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     proxy: {
