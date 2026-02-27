@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { useAuth } from '@/hooks/use-auth';
-import { LuDiamond, LuEye, LuEyeOff, LuArrowRight, LuLoader } from 'react-icons/lu';
+import { LuEye, LuEyeOff, LuArrowRight, LuLoader } from 'react-icons/lu';
+import { MeshGradient, GrainOverlay } from '../../ui/decorative';
 
 export function LoginPage() {
   const { login, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -33,99 +34,98 @@ export function LoginPage() {
   };
 
   return (
-    <div className="bg-void-900 relative flex min-h-screen items-center justify-center">
-      {/* Subtle radial gradient accent */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(200,255,0,0.04)_0%,transparent_70%)]" />
+    <div className="min-h-screen bg-zinc-950 flex items-center justify-center relative overflow-hidden">
+      {/* Background */}
+      <div className="fixed inset-0 pointer-events-none">
+        <MeshGradient />
+      </div>
+      <GrainOverlay opacity={0.12} />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_50%_40%,rgba(99,102,241,0.08)_0%,transparent_70%)]" />
 
-      <form
-        onSubmit={handleSubmit}
-        className="relative z-10 w-full max-w-sm animate-[slide-up_0.4s_var(--ease-out)] space-y-6 px-6"
-      >
-        {/* Logo */}
-        <div className="mb-8 text-center">
-          <LuDiamond className="text-accent-500 mx-auto mb-3" size={32} />
-          <h1 className="font-heading text-void-50 text-xl font-bold">note.gae</h1>
-          <p className="text-void-300 mt-1 text-sm">Welcome back</p>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="border-error/30 bg-error/10 text-error animate-[shake_0.4s_var(--ease-out)] rounded-lg border px-4 py-2.5 text-sm">
-            {error}
+      {/* Login Card */}
+      <div className="relative z-10 w-full max-w-100 mx-auto px-6 animate-[slide-up_0.6s_var(--ease-spring)_both]">
+        <div className="rounded-2xl border border-white/[0.07] bg-white/4 backdrop-blur-2xl p-8 sm:p-10 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.4)]">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-500/20 mb-5 animate-float">
+              <div className="h-2.5 w-2.5 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.6)]" />
+            </div>
+            <h1 className="font-heading text-2xl font-bold tracking-tight text-zinc-50">note.gae</h1>
+            <p className="text-zinc-400 mt-1.5 text-sm">Welcome back</p>
           </div>
-        )}
 
-        {/* Username */}
-        <div>
-          <label
-            htmlFor="login-username"
-            className="text-void-200 mb-1.5 block text-xs font-medium"
-          >
-            Username
-          </label>
-          <input
-            id="login-username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter username"
-            required
-            autoFocus
-            className={`bg-void-700 text-void-50 placeholder:text-void-400 w-full rounded-lg border px-4 py-2.5 text-sm transition-colors focus:outline-none ${
-              error ? 'border-error' : 'border-glass-border focus:border-accent-500'
-            }`}
-          />
-        </div>
-
-        {/* Password */}
-        <div>
-          <label
-            htmlFor="login-password"
-            className="text-void-200 mb-1.5 block text-xs font-medium"
-          >
-            Password
-          </label>
-          <div className="relative">
-            <input
-              id="login-password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-              required
-              className={`bg-void-700 text-void-50 placeholder:text-void-400 w-full rounded-lg border px-4 py-2.5 pr-10 text-sm transition-colors focus:outline-none ${
-                error ? 'border-error' : 'border-glass-border focus:border-accent-500'
-              }`}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="text-void-300 hover:text-void-100 absolute top-1/2 right-3 -translate-y-1/2 transition-colors"
-              tabIndex={-1}
-            >
-              {showPassword ? <LuEyeOff size={16} /> : <LuEye size={16} />}
-            </button>
-          </div>
-        </div>
-
-        {/* Submit */}
-        <button
-          type="submit"
-          disabled={isSubmitting || !username || !password}
-          className="bg-accent-500 text-void-900 hover:bg-accent-400 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50"
-        >
-          {isSubmitting ? (
-            <LuLoader size={16} className="animate-spin" />
-          ) : (
-            <>
-              Sign In
-              <LuArrowRight size={16} />
-            </>
+          {/* Error */}
+          {error && (
+            <div className="border border-red-500/20 bg-red-500/8 text-red-400 animate-shake rounded-xl px-4 py-3 text-sm mb-6 flex items-center gap-2.5">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-red-400 shrink-0" />
+              {error}
+            </div>
           )}
-        </button>
 
-        <p className="text-void-300 text-center text-xs">© 2026 gae</p>
-      </form>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Username */}
+            <div>
+              <label htmlFor="login-username" className="text-zinc-400 mb-2 block text-[11px] font-semibold tracking-widest uppercase">
+                Username
+              </label>
+              <input
+                id="login-username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username"
+                required
+                autoFocus
+                className="w-full rounded-xl border border-white/8 bg-white/4 px-4 py-3 text-sm text-zinc-50 placeholder:text-zinc-600 transition-all duration-200 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 focus:bg-white/6 hover:border-white/[0.14]"
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="login-password" className="text-zinc-400 mb-2 block text-[11px] font-semibold tracking-widest uppercase">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="login-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  required
+                  className="w-full rounded-xl border border-white/8 bg-white/4 px-4 py-3 pr-11 text-sm text-zinc-50 placeholder:text-zinc-600 transition-all duration-200 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 focus:bg-white/6 hover:border-white/[0.14]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute top-1/2 right-3.5 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors p-1 rounded-md"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <LuEyeOff size={16} /> : <LuEye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={isSubmitting || !username || !password}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)] transition-all hover:shadow-[0_6px_20px_-2px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)]"
+            >
+              {isSubmitting ? (
+                <LuLoader size={16} className="animate-spin" />
+              ) : (
+                <>
+                  Sign In
+                  <LuArrowRight size={16} />
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+
+        <p className="text-zinc-600 text-center text-[11px] font-mono tracking-widest mt-8">© 2026 gae</p>
+      </div>
     </div>
   );
 }

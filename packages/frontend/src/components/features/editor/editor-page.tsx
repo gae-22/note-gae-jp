@@ -14,7 +14,6 @@ import {
   LuColumns2,
   LuCheck,
   LuLoader,
-  LuCircleDot,
   LuSettings,
   LuTrash2,
   LuDownload,
@@ -56,12 +55,8 @@ export function EditorPage() {
   }, [noteData]);
 
   const saveMutation = useMutation({
-    mutationFn: (data: {
-      title?: string;
-      content?: string;
-      isPublic?: boolean;
-      tagIds?: string[];
-    }) => api.patch(`/notes/${noteId}`, data),
+    mutationFn: (data: { title?: string; content?: string; isPublic?: boolean; tagIds?: string[] }) =>
+      api.patch(`/notes/${noteId}`, data),
     onSuccess: () => {
       setSaveStatus('saved');
       queryClient.invalidateQueries({ queryKey: ['notes'] });
@@ -89,15 +84,8 @@ export function EditorPage() {
     [saveMutation],
   );
 
-  const handleTitleChange = (value: string) => {
-    setTitle(value);
-    debouncedSave(value, content);
-  };
-
-  const handleContentChange = (value: string) => {
-    setContent(value);
-    debouncedSave(title, value);
-  };
+  const handleTitleChange = (value: string) => { setTitle(value); debouncedSave(value, content); };
+  const handleContentChange = (value: string) => { setContent(value); debouncedSave(title, value); };
 
   const handleSaveNow = () => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -117,22 +105,10 @@ export function EditorPage() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
-        e.preventDefault();
-        handleSaveNow();
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '1') {
-        e.preventDefault();
-        setViewMode('editor');
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '2') {
-        e.preventDefault();
-        setViewMode('preview');
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === '3') {
-        e.preventDefault();
-        setViewMode('split');
-      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); handleSaveNow(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === '1') { e.preventDefault(); setViewMode('editor'); }
+      if ((e.metaKey || e.ctrlKey) && e.key === '2') { e.preventDefault(); setViewMode('preview'); }
+      if ((e.metaKey || e.ctrlKey) && e.key === '3') { e.preventDefault(); setViewMode('split'); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -143,144 +119,133 @@ export function EditorPage() {
   const charCount = content.length;
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-950 flex min-h-screen flex-col font-body transition-colors duration-300">
-      {/* Toolbar */}
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex h-14 shrink-0 items-center justify-between px-4 sm:px-6 shadow-sm z-10 transition-colors">
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => navigate({ to: '/dashboard' })}
-            className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 flex items-center gap-2 text-sm font-medium transition-colors"
-          >
-            <LuArrowLeft size={16} />
-            <span className="hidden sm:inline">Dashboard</span>
-          </button>
-          <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800" />
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col font-body transition-colors duration-300">
+      {/* ─── Toolbar ─── */}
+      <header className="sticky top-0 z-30 w-full border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-2xl backdrop-saturate-150 shrink-0">
+        <div className="flex h-14 items-center justify-between px-4 sm:px-6">
+          {/* Left */}
+          <div className="flex items-center gap-4 sm:gap-6">
+            <button
+              onClick={() => navigate({ to: '/dashboard' })}
+              className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50 flex items-center gap-2 text-sm font-medium transition-colors"
+            >
+              <LuArrowLeft size={16} />
+              <span className="hidden sm:inline">Dashboard</span>
+            </button>
+            <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800" />
 
-          {/* Save status */}
-          <div className="flex items-center gap-2 text-sm font-medium">
-            {saveStatus === 'saved' && (
-              <>
-                <LuCheck size={16} className="text-emerald-500" />
-                <span className="text-emerald-600 dark:text-emerald-400">Saved</span>
-              </>
-            )}
-            {saveStatus === 'saving' && (
-              <>
-                <LuLoader size={16} className="text-zinc-400 animate-spin" />
-                <span className="text-zinc-500 dark:text-zinc-400">Saving...</span>
-              </>
-            )}
-            {saveStatus === 'unsaved' && (
-              <>
-                <LuCircleDot size={16} className="text-amber-500" />
-                <span className="text-amber-600 dark:text-amber-400">Unsaved</span>
-              </>
-            )}
+            {/* Save status */}
+            <div className="flex items-center gap-2 text-sm font-medium">
+              {saveStatus === 'saved' && (
+                <><div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.4)]" /><span className="text-emerald-600 dark:text-emerald-400 hidden sm:inline">Saved</span></>
+              )}
+              {saveStatus === 'saving' && (
+                <><LuLoader size={14} className="text-zinc-400 animate-spin" /><span className="text-zinc-500 dark:text-zinc-400 hidden sm:inline">Saving...</span></>
+              )}
+              {saveStatus === 'unsaved' && (
+                <><div className="h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.4)]" /><span className="text-amber-600 dark:text-amber-400 hidden sm:inline">Unsaved</span></>
+              )}
+            </div>
+          </div>
+
+          {/* Right */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* View mode toggle */}
+            <div className="flex items-center rounded-xl bg-zinc-100 dark:bg-zinc-800/60 p-1 border border-zinc-200/60 dark:border-zinc-700/50">
+              {(['editor', 'preview', 'split'] as const).map((mode, i) => {
+                const icons = [LuCode, LuEye, LuColumns2];
+                const labels = ['Editor (⌘1)', 'Preview (⌘2)', 'Split (⌘3)'];
+                const Icon = icons[i];
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => setViewMode(mode)}
+                    className={`rounded-lg p-2 transition-all duration-200 ${
+                      viewMode === mode
+                        ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-400 shadow-sm border border-zinc-200/60 dark:border-zinc-600/60'
+                        : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50'
+                    }`}
+                    title={labels[i]}
+                  >
+                    <Icon size={16} />
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
+
+            <div className="flex items-center gap-1">
+              <button onClick={handleExportMd} className="text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 rounded-lg p-2 transition-colors" title="Export">
+                <LuDownload size={18} />
+              </button>
+              <button onClick={() => { if (confirm('Delete this document?')) deleteMutation.mutate(); }} className="text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-red-900/20 dark:hover:text-red-400 rounded-lg p-2 transition-colors" title="Delete">
+                <LuTrash2 size={18} />
+              </button>
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className={`rounded-lg p-2 transition-all duration-200 ${
+                  showSettings
+                    ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-500/20'
+                    : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
+                }`}
+                title="Settings"
+              >
+                <LuSettings size={18} />
+              </button>
+            </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-4">
-          {/* View mode */}
-          <div className="bg-zinc-100 dark:bg-zinc-800/50 flex items-center rounded-lg p-1 border border-zinc-200 dark:border-zinc-700/50">
-            {(['editor', 'preview', 'split'] as const).map((mode, i) => {
-              const icons = [LuCode, LuEye, LuColumns2];
-              const labels = ['Editor (⌘1)', 'Preview (⌘2)', 'Split (⌘3)'];
-              const Icon = icons[i];
-              return (
-                <button
-                  key={mode}
-                  onClick={() => setViewMode(mode)}
-                  className={`rounded-md p-2 transition-all ${
-                    viewMode === mode
-                      ? 'bg-white dark:bg-zinc-700 text-indigo-600 dark:text-indigo-400 shadow-xs ring-1 ring-zinc-200 dark:ring-zinc-600'
-                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 hover:bg-zinc-50 dark:hover:bg-zinc-800'
-                  }`}
-                  title={labels[i]}
-                >
-                  <Icon size={16} />
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
-
-          <div className="flex items-center gap-1.5 sm:flex">
-            <button
-              onClick={handleExportMd}
-              className="text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 rounded-md p-2 transition-colors"
-              title="Export Markdown"
-            >
-              <LuDownload size={18} />
-            </button>
-            <button
-              onClick={() => {
-                if (confirm('Are you sure you want to delete this document?')) deleteMutation.mutate();
-              }}
-              className="text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-red-900/20 dark:hover:text-red-400 rounded-md p-2 transition-colors"
-              title="Delete Note"
-            >
-              <LuTrash2 size={18} />
-            </button>
-            <button
-              onClick={() => setShowSettings(!showSettings)}
-              className={`rounded-md p-2 transition-colors ${
-                showSettings
-                  ? 'bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400'
-                  : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50'
-              }`}
-              title="Settings"
-            >
-              <LuSettings size={18} />
-            </button>
-          </div>
-        </div>
+        <div className="h-px bg-linear-to-r from-transparent via-indigo-500/20 to-transparent" />
       </header>
 
-      {/* Title */}
-      <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 px-6 py-4 shadow-sm z-10 transition-colors">
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => handleTitleChange(e.target.value)}
-          placeholder="Document Title..."
-          className="font-heading text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 w-full bg-transparent text-3xl sm:text-4xl font-bold focus:outline-none"
-        />
+      {/* ─── Title Input ─── */}
+      <div className="w-full border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-950 px-6 sm:px-8 py-5 shrink-0">
+        <div className="mx-auto max-w-4xl">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => handleTitleChange(e.target.value)}
+            placeholder="Document Title..."
+            className="w-full bg-transparent font-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:outline-none"
+          />
+        </div>
       </div>
 
-      {/* Editor + Preview */}
+      {/* ─── Editor / Preview ─── */}
       <div className="flex flex-1 overflow-hidden relative">
         {(viewMode === 'editor' || viewMode === 'split') && (
-          <div
-            className={`${viewMode === 'split' ? 'border-r border-zinc-200 dark:border-zinc-800 w-1/2' : 'w-full'} flex flex-col bg-white dark:bg-zinc-950 transition-colors`}
-          >
+          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col bg-white dark:bg-zinc-950 relative`}>
+            {viewMode === 'split' && (
+              <div className="absolute top-0 right-0 bottom-0 w-px bg-linear-to-b from-transparent via-indigo-500/15 to-transparent z-10" />
+            )}
             <EditorPane value={content} onChange={handleContentChange} />
           </div>
         )}
-
         {(viewMode === 'preview' || viewMode === 'split') && (
-          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-zinc-50 dark:bg-zinc-900/50 transition-colors overflow-y-auto`}>
-            <div className="max-w-4xl mx-auto p-8 sm:p-12">
+          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-zinc-50 dark:bg-zinc-900/50 overflow-y-auto`}>
+            <div className="mx-auto max-w-3xl p-8 sm:p-12">
               <PreviewPane content={content} />
             </div>
           </div>
         )}
       </div>
 
-      {/* Status bar */}
-      <footer className="border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 flex h-8 shrink-0 items-center justify-between px-4 text-xs font-mono transition-colors">
-        <div className="flex items-center gap-6">
+      {/* ─── Status Bar ─── */}
+      <footer className="w-full border-t border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 flex h-8 shrink-0 items-center justify-between px-4 sm:px-6 text-xs font-mono transition-colors">
+        <div className="flex items-center gap-4 sm:gap-6">
           <span>{lineCount} lines</span>
           <span className="hidden sm:inline">{wordCount} words</span>
           <span className="hidden sm:inline">{charCount} chars</span>
         </div>
-        <div className="flex items-center justify-end gap-6 text-right w-full sm:w-auto">
+        <div className="flex items-center gap-4 sm:gap-6">
           {noteData?.note?.isPublic !== undefined && (
-            <span className="font-semibold text-indigo-600 dark:text-indigo-400">
-              {noteData.note.isPublic ? '🌐 Public Document' : '🔒 Private Document'}
+            <span className={`font-semibold flex items-center gap-1.5 ${noteData.note.isPublic ? 'text-indigo-500' : 'text-zinc-500'}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${noteData.note.isPublic ? 'bg-indigo-500' : 'bg-zinc-400'}`} />
+              {noteData.note.isPublic ? 'Public' : 'Private'}
             </span>
           )}
-          <span className="hidden sm:inline">Markdown</span>
+          <span className="hidden sm:inline text-zinc-400">Markdown</span>
         </div>
       </footer>
 
@@ -290,12 +255,8 @@ export function EditorPage() {
           noteId={noteId}
           isPublic={noteData.note.isPublic}
           noteTags={noteData.note.tags}
-          onTogglePublic={(pub) => {
-            saveMutation.mutate({ isPublic: pub });
-          }}
-          onUpdateTags={(tagIds) => {
-            saveMutation.mutate({ tagIds });
-          }}
+          onTogglePublic={(pub) => saveMutation.mutate({ isPublic: pub })}
+          onUpdateTags={(tagIds) => saveMutation.mutate({ tagIds })}
           onClose={() => setShowSettings(false)}
         />
       )}

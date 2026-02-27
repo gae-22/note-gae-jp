@@ -3,7 +3,8 @@ import { useParams, useNavigate } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { NoteListItem, Comment } from '@note-gae/shared';
 import { renderMarkdown } from '@/lib/markdown';
-import { LuDiamond, LuMessageSquare, LuSend } from 'react-icons/lu';
+import { LuMessageSquare, LuSend, LuLoader } from 'react-icons/lu';
+import { GrainOverlay, MeshGradient } from '../../ui/decorative';
 
 export function SharePage() {
   const { token } = useParams({ from: '/s/$token' });
@@ -19,13 +20,9 @@ export function SharePage() {
       const res = await fetch(`/api/notes?token=${token}`, { credentials: 'include' });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
-
       const noteId = json.data?.notes?.[0]?.id;
       if (!noteId) throw new Error('Note not found');
-
-      const noteRes = await fetch(`/api/notes/${noteId}?token=${token}`, {
-        credentials: 'include',
-      });
+      const noteRes = await fetch(`/api/notes/${noteId}?token=${token}`, { credentials: 'include' });
       const noteData = await noteRes.json();
       if (!noteData.success) throw new Error(noteData.error);
       return noteData.data as { note: NoteListItem };
@@ -42,7 +39,6 @@ export function SharePage() {
     enabled: !!noteData?.note?.id,
   });
 
-  // Render markdown
   useEffect(() => {
     if (noteData?.note?.content) {
       renderMarkdown(noteData.note.content).then(setPreviewHtml);
@@ -72,8 +68,12 @@ export function SharePage() {
 
   if (!noteData) {
     return (
-      <div className="bg-void-900 flex min-h-screen items-center justify-center">
-        <div className="text-void-300">Loading...</div>
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center relative overflow-hidden">
+        <div className="fixed inset-0 pointer-events-none"><MeshGradient /></div>
+        <div className="relative z-10 flex items-center gap-3 text-zinc-400 animate-pulse">
+          <LuLoader size={18} className="animate-spin" />
+          <span className="text-sm font-mono tracking-wider">Loading document...</span>
+        </div>
       </div>
     );
   }
@@ -82,80 +82,92 @@ export function SharePage() {
   const comments_ = commentsData?.comments ?? [];
 
   return (
-    <div className="bg-void-900 min-h-screen">
-      <header className="border-glass-border bg-void-800 flex h-12 items-center border-b px-6">
-        <div className="flex items-center gap-2">
-          <LuDiamond className="text-accent-500" size={18} />
-          <span className="font-heading text-void-50 text-sm font-bold">note.gae</span>
+    <div className="min-h-screen bg-zinc-950 text-zinc-50 font-body relative overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none"><MeshGradient /></div>
+      <GrainOverlay opacity={0.1} />
+
+      {/* Header */}
+      <header className="sticky top-0 z-30 w-full border-b border-white/6 bg-zinc-950/70 backdrop-blur-2xl backdrop-saturate-150">
+        <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6 lg:px-8">
+          <div className="flex items-center gap-2.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-indigo-500 shadow-[0_0_6px_rgba(99,102,241,0.6)]" />
+            <span className="font-heading text-sm font-bold tracking-tight">note.gae</span>
+          </div>
+          <span className="text-zinc-500 text-[10px] font-mono tracking-widest uppercase">Shared with you</span>
         </div>
-        <span className="text-void-300 ml-auto text-xs">Shared with you</span>
+        <div className="h-px bg-linear-to-r from-transparent via-indigo-500/20 to-transparent" />
       </header>
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
-        <h1 className="font-heading text-void-50 mb-3 text-2xl font-bold">
-          {note.title || 'Untitled'}
-        </h1>
+      <main className="relative z-10 mx-auto max-w-4xl px-6 lg:px-8 py-12 md:py-20">
+        {/* Title area */}
+        <div className="mb-10 animate-reveal">
+          <h1 className="font-heading text-3xl md:text-4xl font-bold tracking-tight leading-tight mb-5">
+            {note.title || 'Untitled'}
+          </h1>
+          {note.tags.length > 0 && (
+            <div className="mb-5 flex flex-wrap gap-2">
+              {note.tags.map((tag) => (
+                <span key={tag.id} className="bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 rounded-lg px-2.5 py-1 text-xs font-mono">
+                  {tag.name}
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="text-zinc-500 text-xs font-mono tracking-wider">Shared by gae</p>
+        </div>
 
-        {note.tags.length > 0 && (
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {note.tags.map((tag) => (
-              <span
-                key={tag.id}
-                className="bg-accent-glow text-accent-500 rounded-full px-2 py-0.5 text-xs"
-              >
-                {tag.name}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <p className="text-void-300 mb-8 text-xs">Shared by gae</p>
-
-        <div className="prose-void border-glass-border border-t pt-8">
+        {/* Content */}
+        <div className="prose-void border-t border-white/6 pt-10 animate-reveal" style={{ animationDelay: '100ms' }}>
           <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
         </div>
 
         {/* Comments */}
-        <div className="border-glass-border mt-12 border-t pt-8">
-          <h2 className="font-heading text-void-50 mb-6 flex items-center gap-2 text-lg font-semibold">
-            <LuMessageSquare size={18} />
+        <div className="border-t border-white/6 mt-14 pt-10 animate-reveal" style={{ animationDelay: '200ms' }}>
+          <h2 className="font-heading mb-8 flex items-center gap-2.5 text-lg font-semibold tracking-tight">
+            <LuMessageSquare size={18} className="text-indigo-400" />
             Comments ({comments_.length})
           </h2>
 
           <div className="mb-8 space-y-4">
-            {comments_.map((c) => (
-              <div key={c.id} className="bg-void-700 rounded-lg p-4">
-                <div className="mb-2 flex items-center gap-2">
-                  <span className="text-void-50 text-sm font-medium">{c.authorName}</span>
-                  <span className="text-void-300 text-xs">
-                    {new Date(c.createdAt).toLocaleDateString()}
-                  </span>
+            {comments_.map((c, idx) => (
+              <div
+                key={c.id}
+                className="rounded-xl border border-white/6 bg-white/3 backdrop-blur-sm p-5 animate-reveal"
+                style={{ animationDelay: `${idx * 50}ms` }}
+              >
+                <div className="mb-2.5 flex items-center gap-2.5">
+                  <div className="h-7 w-7 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-xs font-bold text-indigo-300">
+                    {c.authorName.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-sm font-medium text-zinc-200">{c.authorName}</span>
+                  <span className="text-xs font-mono text-zinc-600">{new Date(c.createdAt).toLocaleDateString()}</span>
                 </div>
-                <p className="text-void-100 text-sm">{c.body}</p>
+                <p className="text-sm leading-relaxed text-zinc-300 pl-9">{c.body}</p>
               </div>
             ))}
           </div>
 
-          <div className="bg-void-700 space-y-3 rounded-lg p-4">
+          {/* Form */}
+          <div className="rounded-xl border border-white/6 bg-white/3 backdrop-blur-sm space-y-3 p-5">
             <input
               type="text"
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
               placeholder="Your Name"
-              className="border-glass-border bg-void-600 text-void-50 placeholder:text-void-300 focus:border-accent-500 w-full rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none"
+              className="w-full rounded-lg border border-white/8 bg-white/4 px-4 py-2.5 text-sm text-zinc-50 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all hover:border-white/[0.14]"
             />
             <textarea
               value={commentBody}
               onChange={(e) => setCommentBody(e.target.value)}
               placeholder="Write a comment..."
               rows={3}
-              className="border-glass-border bg-void-600 text-void-50 placeholder:text-void-300 focus:border-accent-500 w-full resize-none rounded-md border px-3 py-2 text-sm transition-colors focus:outline-none"
+              className="w-full resize-none rounded-lg border border-white/8 bg-white/4 px-4 py-2.5 text-sm text-zinc-50 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20 transition-all hover:border-white/[0.14]"
             />
             <div className="flex justify-end">
               <button
                 onClick={() => addComment.mutate()}
                 disabled={!authorName || !commentBody || addComment.isPending}
-                className="bg-accent-500 text-void-900 hover:bg-accent-400 flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_20px_-2px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
               >
                 <LuSend size={14} />
                 Add Comment
@@ -164,7 +176,7 @@ export function SharePage() {
           </div>
         </div>
 
-        <footer className="text-void-300 mt-12 text-center text-xs">© 2026 gae</footer>
+        <footer className="text-zinc-600 mt-16 text-center text-[11px] font-mono tracking-widest">© 2026 gae</footer>
       </main>
     </div>
   );

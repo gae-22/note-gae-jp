@@ -77,21 +77,21 @@ export function NoteSettingsPanel({
         onClick={onClose}
       />
 
-      <div className="border-l border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl fixed inset-y-0 right-0 z-50 w-80 animate-[slide-in-right_0.2s_ease-out] shadow-2xl transition-colors">
+      <div className="border-l border-zinc-200/80 dark:border-zinc-800/80 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-2xl fixed inset-y-0 right-0 z-50 w-80 animate-[slide-in-right_0.25s_var(--ease-spring)] shadow-2xl transition-colors">
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 px-5 py-4">
-            <h2 className="font-heading text-zinc-900 dark:text-zinc-50 text-base font-bold">Document Settings</h2>
+          <div className="flex items-center justify-between border-b border-zinc-200/80 dark:border-zinc-800/80 px-5 py-4">
+            <h2 className="font-heading text-zinc-900 dark:text-zinc-50 text-base font-bold tracking-tight">Document Settings</h2>
             <button
               onClick={onClose}
-              className="text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-50 rounded-md p-1.5 transition-colors"
+              className="text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-zinc-900 dark:hover:text-zinc-50 rounded-lg p-1.5 transition-colors"
             >
               <LuX size={18} />
             </button>
           </div>
 
-          <div className="flex-1 space-y-8 overflow-y-auto p-5 custom-scrollbar">
-            {/* Visibility */}
+          <div className="flex-1 space-y-8 overflow-y-auto p-5">
+            {/* Visibility — Neumorphism 2.0 */}
             <section>
               <h3 className="text-zinc-500 dark:text-zinc-400 mb-3 text-[10px] font-bold tracking-widest uppercase">
                 Visibility
@@ -99,10 +99,10 @@ export function NoteSettingsPanel({
               <div className="flex gap-2">
                 <button
                   onClick={() => onTogglePublic(true)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 border ${
                     isPublic
-                      ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 shadow-sm'
-                      : 'bg-zinc-50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 border border-zinc-200 dark:border-zinc-700/50'
+                      ? 'neo-toggle-active'
+                      : 'bg-zinc-50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 border-zinc-200 dark:border-zinc-700/50'
                   }`}
                 >
                   <LuGlobe size={16} className={isPublic ? 'text-indigo-500' : 'text-zinc-400'} />
@@ -110,10 +110,10 @@ export function NoteSettingsPanel({
                 </button>
                 <button
                   onClick={() => onTogglePublic(false)}
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 border ${
                     !isPublic
-                      ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 shadow-sm'
-                      : 'bg-zinc-50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 border border-zinc-200 dark:border-zinc-700/50'
+                      ? 'neo-toggle-active'
+                      : 'bg-zinc-50 dark:bg-zinc-800/50 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50 border-zinc-200 dark:border-zinc-700/50'
                   }`}
                 >
                   <LuLock size={16} className={!isPublic ? 'text-indigo-500' : 'text-zinc-400'} />
@@ -132,10 +132,10 @@ export function NoteSettingsPanel({
                   <button
                     key={tag.id}
                     onClick={() => handleTagToggle(tag.id)}
-                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all ${
+                    className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-200 border ${
                       selectedTagIds.includes(tag.id)
-                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-300 dark:ring-indigo-700/50'
-                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-50 border border-transparent'
+                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700/50 shadow-sm'
+                        : 'bg-zinc-50 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-50 border-zinc-200/50 dark:border-zinc-700/50'
                     }`}
                   >
                     <span
@@ -157,7 +157,7 @@ export function NoteSettingsPanel({
                 </h3>
                 <button
                   onClick={() => setShowCreateToken(!showCreateToken)}
-                  className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 font-medium flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors"
+                  className="text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 font-medium flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition-colors"
                 >
                   <LuPlus size={14} />
                   New
@@ -172,12 +172,12 @@ export function NoteSettingsPanel({
                     value={newTokenLabel}
                     onChange={(e) => setNewTokenLabel(e.target.value)}
                     placeholder="Label (optional)"
-                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full rounded-md border px-3 py-2 text-sm transition-all outline-none"
+                    className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 dark:placeholder:text-zinc-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 w-full rounded-lg border px-3 py-2 text-sm transition-all outline-none"
                   />
                   <select
                     value={newTokenExpiry}
                     onChange={(e) => setNewTokenExpiry(e.target.value as typeof newTokenExpiry)}
-                    className="bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-full rounded-md border px-3 py-2 text-sm transition-all outline-none"
+                    className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 w-full rounded-lg border px-3 py-2 text-sm transition-all outline-none"
                   >
                     <option value="1h">1 hour</option>
                     <option value="1d">1 day</option>
@@ -187,7 +187,7 @@ export function NoteSettingsPanel({
                   <button
                     onClick={handleCreateToken}
                     disabled={createToken.isPending}
-                    className="bg-indigo-600 text-white hover:bg-indigo-700 w-full rounded-md px-3 py-2 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                    className="btn-primary w-full rounded-lg px-3 py-2 text-sm disabled:cursor-not-allowed"
                   >
                     Create Link
                   </button>
@@ -201,12 +201,12 @@ export function NoteSettingsPanel({
                     key={token.id}
                     className={`rounded-xl border p-3.5 transition-all ${
                       token.isRevoked
-                        ? 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 opacity-60'
-                        : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800/80 shadow-sm hover:shadow-md'
+                        ? 'border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 opacity-50'
+                        : 'border-zinc-200/80 dark:border-zinc-700/80 bg-white dark:bg-zinc-800/80 shadow-sm hover:shadow-md glass-card'
                     }`}
                   >
                     <div className="mb-1.5 flex items-center gap-2">
-                      <LuLink size={14} className="text-zinc-400 dark:text-zinc-500 shrink-0" />
+                      <LuLink size={14} className="text-indigo-500/60 shrink-0" />
                       <span className="text-zinc-900 dark:text-zinc-100 truncate text-sm font-semibold">
                         {token.label || 'Untitled Link'}
                       </span>
@@ -219,10 +219,10 @@ export function NoteSettingsPanel({
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleCopy(token.shareUrl, token.id)}
-                          className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                          className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-all border ${
                             copiedId === token.id
-                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
-                              : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200 dark:bg-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-600'
+                              ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20'
+                              : 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100 dark:bg-zinc-700/50 dark:text-zinc-300 dark:hover:bg-zinc-600/50 border-zinc-200/50 dark:border-zinc-600/50'
                           }`}
                         >
                           {copiedId === token.id ? (
@@ -237,7 +237,7 @@ export function NoteSettingsPanel({
                         </button>
                         <button
                           onClick={() => revokeToken.mutate(token.id)}
-                          className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors"
+                          className="text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium transition-colors border border-transparent hover:border-red-200 dark:hover:border-red-500/20"
                         >
                           <LuShieldOff size={14} />
                           Revoke
