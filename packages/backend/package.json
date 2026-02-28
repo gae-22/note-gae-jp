@@ -11,9 +11,11 @@
   },
   "dependencies": {
     "@note-gae/shared": "workspace:*",
+    "@types/uuid": "^11.0.0",
     "drizzle-orm": "^0.38",
     "hono": "^4",
     "nanoid": "^5",
+    "uuid": "^13.0.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

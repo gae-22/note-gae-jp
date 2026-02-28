@@ -4,8 +4,9 @@ import { getEnv } from './env';
 import { authMiddleware } from './middleware/auth';
 import { authRoutes } from './routes/auth';
 import { notesRoutes } from './routes/notes';
-import { tagsRoutes } from './routes/tags';
-import { tokensRoutes } from './routes/tokens';
+import tagsRouter from './routes/tags';
+import tokensRouter from './routes/tokens';
+import booksRouter from './routes/books';
 import { commentsRoutes } from './routes/comments';
 import { publicRoutes } from './routes/public';
 
@@ -26,8 +27,9 @@ app.use('/api/*', authMiddleware());
 // Routes
 app.route('/api/auth', authRoutes);
 app.route('/api/notes', notesRoutes);
-app.route('/api/tags', tagsRoutes);
-app.route('/api/tokens', tokensRoutes);
+app.route('/api/tags', tagsRouter);
+app.route('/api/tokens', tokensRouter);
+app.route('/api/books', booksRouter);
 app.route('/api/comments', commentsRoutes);
 app.route('/api/public', publicRoutes);
 

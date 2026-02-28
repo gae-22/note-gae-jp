@@ -109,3 +109,39 @@ export const comments = sqliteTable(
     index('idx_comments_created_at').on(table.createdAt),
   ],
 );
+
+// ── Books ───────────────────────────────────────────
+export const books = sqliteTable('books', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull().default(''),
+  description: text('description').notNull().default(''),
+  slug: text('slug').notNull().unique(),
+  isPublic: integer('is_public', { mode: 'boolean' }).notNull().default(false),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+// ── Chapters (Books ↔ Notes) ────────────────────────
+export const chapters = sqliteTable('chapters', {
+  id: text('id').primaryKey(),
+  bookId: text('book_id')
+    .notNull()
+    .references(() => books.id, { onDelete: 'cascade' }),
+  noteId: text('note_id')
+    .notNull()
+    .references(() => notes.id, { onDelete: 'cascade' }),
+  title: text('title'), // Nullable: If null, fallback to note's title
+  order: integer('order').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date()),
+}, (table) => [
+  index('idx_chapters_book_id').on(table.bookId),
+]);

@@ -58,3 +58,5 @@ tokensRoutes.delete('/:id', requireAdmin(), (c) => {
   tokensService.revokeToken(id);
   return c.json({ success: true });
 });
+
+export default tokensRoutes;

@@ -7,6 +7,10 @@ import { SharePage } from './components/features/share/share-page';
 import { TokenExpiredPage } from './components/features/share/token-expired';
 import { PublicNotesPage } from './components/features/public/public-notes-page';
 import { PublicNoteDetailPage } from './components/features/public/public-note-detail-page';
+import { PublicBooksPage } from './components/features/public/public-books-page';
+import { PublicBookCoverPage } from './components/features/public/public-book-cover-page';
+import { PublicBookChapterPage } from './components/features/public/public-book-chapter-page';
+import { BookEditorPage } from './components/features/books/book-editor-page';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -56,10 +60,34 @@ const publicIndexRoute = createRoute({
   component: PublicNotesPage,
 });
 
+const publicBooksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/books',
+  component: PublicBooksPage,
+});
+
+const publicBookCoverRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/books/$slug',
+  component: PublicBookCoverPage,
+});
+
+const publicBookChapterRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/books/$slug/$chapterId',
+  component: PublicBookChapterPage,
+});
+
 const publicNoteRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/notes/$noteId',
   component: PublicNoteDetailPage,
+});
+
+const bookEditorRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/books/$bookId/edit',
+  component: BookEditorPage,
 });
 
 const routeTree = rootRoute.addChildren([
@@ -69,7 +97,11 @@ const routeTree = rootRoute.addChildren([
   shareRoute,
   expiredRoute,
   publicIndexRoute,
+  publicBooksRoute,
+  publicBookCoverRoute,
+  publicBookChapterRoute,
   publicNoteRoute,
+  bookEditorRoute,
 ]);
 
 const router = createRouter({ routeTree });

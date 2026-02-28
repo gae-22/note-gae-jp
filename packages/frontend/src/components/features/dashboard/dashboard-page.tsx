@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useAuth } from '@/hooks/use-auth';
 import { useNotes, useCreateNote, useDeleteNote } from '@/hooks/use-notes';
 import { useTags, useCreateTag, useDeleteTag } from '@/hooks/use-tags';
+import { useBooks, useCreateBook, useDeleteBook } from '@/hooks/use-books';
 import { useTheme } from '@/hooks/use-theme';
 import { useGlobalShortcuts } from '@/hooks/use-shortcuts';
 import {
@@ -19,6 +20,8 @@ import {
   LuGlobe,
   LuLock,
   LuMenu,
+  LuBook,
+  LuFolder,
 } from 'react-icons/lu';
 
 export function DashboardPage() {
@@ -30,6 +33,9 @@ export function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showNewTag, setShowNewTag] = useState(false);
   const [newTagName, setNewTagName] = useState('');
+  const [activeTab, setActiveTab] = useState<'notes' | 'books'>('notes');
+  const [showNewBook, setShowNewBook] = useState(false);
+  const [newBookTitle, setNewBookTitle] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -51,6 +57,11 @@ export function DashboardPage() {
   });
 
   const { data: tagsData } = useTags(isAuthenticated);
+
+  const { data: booksData, isLoading: booksLoading } = useBooks(isAuthenticated);
+  const createBook = useCreateBook();
+  const deleteBook = useDeleteBook();
+
   const createNote = useCreateNote();
   const deleteNote = useDeleteNote();
   const createTag = useCreateTag();
@@ -59,6 +70,19 @@ export function DashboardPage() {
   async function handleNewNote() {
     const result = await createNote.mutateAsync({ title: '', content: '' });
     navigate({ to: '/notes/$noteId/edit', params: { noteId: result.note.id } });
+  }
+
+  async function handleNewBook(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newBookTitle.trim() || createBook.isPending) return;
+
+    // Generate simple slug
+    const slug = newBookTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') + '-' + Math.random().toString(36).substring(2, 6);
+    const result = await createBook.mutateAsync({ title: newBookTitle, slug: slug });
+
+    setNewBookTitle('');
+    setShowNewBook(false);
+    navigate({ to: '/books/$bookId/edit', params: { bookId: result.book.id } });
   }
 
   const handleCreateTag = async () => {
@@ -78,6 +102,7 @@ export function DashboardPage() {
 
   const notes = notesData?.notes ?? [];
   const tags = tagsData?.tags ?? [];
+  const books = booksData?.books ?? [];
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col font-body text-zinc-900 dark:text-zinc-50 transition-colors duration-300">
@@ -150,9 +175,9 @@ export function DashboardPage() {
 
           <div className="space-y-1 px-3">
             <button
-              onClick={() => setSelectedTags([])}
+              onClick={() => { setActiveTab('notes'); setSelectedTags([]); }}
               className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
-                selectedTags.length === 0
+                activeTab === 'notes' && selectedTags.length === 0
                   ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-500/20'
                   : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
               }`}
@@ -160,6 +185,18 @@ export function DashboardPage() {
               <LuFileText size={16} />
               <span>All Notes</span>
               <span className="ml-auto text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full font-mono">{notes.length}</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('books')}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                activeTab === 'books'
+                  ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200/50 dark:border-indigo-500/20'
+                  : 'text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800/50'
+              }`}
+            >
+              <LuBook size={16} />
+              <span>All Books</span>
+              <span className="ml-auto text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full font-mono">{books.length}</span>
             </button>
           </div>
 
@@ -216,27 +253,38 @@ export function DashboardPage() {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto p-6 sm:p-8 md:p-10 lg:p-12">
+        <main className="flex-1 overflow-auto p-6 sm:p-8 md:p-10 lg:p-12 relative">
           <div className="mx-auto max-w-5xl">
             {/* Top bar */}
             <div className="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight mb-1">Documents</h1>
-                <p className="text-zinc-500 text-sm">Manage your notes and ideas.</p>
+                <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight mb-1">{activeTab === 'notes' ? 'Documents' : 'Books'}</h1>
+                <p className="text-zinc-500 text-sm">Manage your {activeTab === 'notes' ? 'notes and ideas' : 'book collections'}.</p>
               </div>
-              <button
-                onClick={handleNewNote}
-                disabled={createNote.isPending}
-                className="flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_20px_-2px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 sm:w-auto w-full"
-              >
-                <LuPlus size={18} />
-                New Document
-              </button>
+
+              {activeTab === 'notes' ? (
+                <button
+                  onClick={handleNewNote}
+                  disabled={createNote.isPending}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_20px_-2px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0 sm:w-auto w-full"
+                >
+                  <LuPlus size={18} />
+                  New Document
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowNewBook(true)}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_20px_-2px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all sm:w-auto w-full"
+                >
+                  <LuFolder size={18} />
+                  New Book
+                </button>
+              )}
             </div>
 
-            {/* Note Grid */}
+            {/* Grid */}
             <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-5">
-              {notes.map((note, idx) => (
+              {activeTab === 'notes' ? notes.map((note, idx) => (
                 <div
                   key={note.id}
                   className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 p-5 transition-all duration-300 hover:shadow-[0_8px_30px_-8px_rgba(99,102,241,0.12)] hover:border-indigo-200 dark:hover:border-indigo-500/25 hover:-translate-y-1 animate-reveal"
@@ -280,23 +328,125 @@ export function DashboardPage() {
                     <LuTrash2 size={15} />
                   </button>
                 </div>
+              )) : books.map((book, idx) => (
+                <div
+                  key={book.id}
+                  className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-zinc-200/80 dark:border-zinc-800/80 bg-white dark:bg-zinc-900 p-5 transition-all duration-300 hover:shadow-[0_8px_30px_-8px_rgba(99,102,241,0.12)] hover:border-indigo-200 dark:hover:border-indigo-500/25 hover:-translate-y-1 animate-reveal"
+                  style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}
+                >
+                  <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-indigo-500/2 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                  <button
+                    onClick={() => navigate({ to: '/books/$bookId/edit', params: { bookId: book.id } } as any)}
+                    className="relative w-full text-left flex-1 flex flex-col outline-none"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                        <LuBook size={18} />
+                      </div>
+                      <h3 className="font-heading text-lg font-bold tracking-tight leading-snug line-clamp-1 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors duration-200">
+                        {book.title || 'Untitled Book'}
+                      </h3>
+                    </div>
+
+                    <p className="text-zinc-400 text-sm line-clamp-2 mb-4 flex-1">{book.description || 'No description provided.'}</p>
+
+                    <div className="mt-auto">
+                      <div className="flex items-center justify-between text-xs border-t border-zinc-100 dark:border-zinc-800/60 pt-3">
+                        {book.isPublic ? (
+                          <span className="flex items-center gap-1 text-indigo-500 bg-indigo-500/8 border border-indigo-500/15 px-2 py-0.5 rounded-md text-[10px] font-bold font-mono tracking-wider"><LuGlobe size={10} />PUBLIC</span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-zinc-500 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200/50 dark:border-zinc-700/50 px-2 py-0.5 rounded-md text-[10px] font-bold font-mono tracking-wider"><LuLock size={10} />PRIVATE</span>
+                        )}
+                        <span className="font-mono text-[10px] text-zinc-400">{new Date(book.updatedAt).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={(e) => { e.stopPropagation(); if (confirm('Delete this book?')) deleteBook.mutate(book.id); }}
+                    className="absolute top-4 right-4 text-zinc-300 hover:text-red-500 dark:text-zinc-600 dark:hover:text-red-400 p-2 rounded-xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur outline-none opacity-0 group-hover:opacity-100 transition-all border border-zinc-200/50 dark:border-zinc-700/50 hover:border-red-200 dark:hover:border-red-900/30 shadow-sm"
+                    title="Delete Book"
+                  >
+                    <LuTrash2 size={15} />
+                  </button>
+                </div>
               ))}
             </div>
 
             {/* Empty state */}
-            {notes.length === 0 && !notesLoading && (
-              <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 py-24 text-center animate-reveal">
-                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
-                  <LuFileText size={32} className="text-zinc-400 dark:text-zinc-500" />
+            {activeTab === 'notes' ? (
+              notes.length === 0 && !notesLoading && (
+                <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 py-24 text-center animate-reveal">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                    <LuFileText size={32} className="text-zinc-400 dark:text-zinc-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-1 font-heading">No documents found</h3>
+                  <p className="text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto text-sm">Get started by creating a new markdown document.</p>
+                  <button onClick={handleNewNote} className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_20px_-2px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all">
+                    <LuPlus size={16} />
+                    New Document
+                  </button>
                 </div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-1 font-heading">No documents found</h3>
-                <p className="text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto text-sm">Get started by creating a new markdown document.</p>
-                <button onClick={handleNewNote} className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_20px_-2px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all">
-                  <LuPlus size={16} />
-                  New Document
-                </button>
+              )
+            ) : (
+              books.length === 0 && !booksLoading && (
+                <div className="rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900/50 py-24 text-center animate-reveal">
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
+                    <LuBook size={32} className="text-zinc-400 dark:text-zinc-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-1 font-heading">No books found</h3>
+                  <p className="text-zinc-500 dark:text-zinc-400 mb-6 max-w-sm mx-auto text-sm">Get started by creating a new book to group your notes.</p>
+                  <button onClick={() => setShowNewBook(true)} className="inline-flex items-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_4px_12px_-2px_rgba(99,102,241,0.4)] hover:shadow-[0_6px_20px_-2px_rgba(99,102,241,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all">
+                    <LuFolder size={16} />
+                    New Book
+                  </button>
+                </div>
+              )
+            )}
+
+            {/* New Book Modal */}
+            {showNewBook && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 dark:bg-black/60 backdrop-blur-sm px-4 animate-fade-in">
+                <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-float border border-zinc-200/50 dark:border-zinc-800/50 p-6 animate-reveal" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="font-heading text-xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">Create New Book</h3>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">A book allows you to organize multiple notes into structured chapters.</p>
+
+                  <form onSubmit={handleNewBook}>
+                    <div className="mb-6">
+                      <label htmlFor="bookTitle" className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">Book Title</label>
+                      <input
+                        id="bookTitle"
+                        type="text"
+                        value={newBookTitle}
+                        onChange={(e) => setNewBookTitle(e.target.value)}
+                        placeholder="e.g. Next.js Architecture Guide"
+                        className="w-full rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="flex sm:justify-end gap-3 flex-col sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => setShowNewBook(false)}
+                        className="rounded-xl border border-zinc-200 dark:border-zinc-700 px-5 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors w-full sm:w-auto"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={!newBookTitle.trim() || createBook.isPending}
+                        className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all w-full sm:w-auto"
+                      >
+                        {createBook.isPending ? 'Creating...' : 'Create Book'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
             )}
+
           </div>
         </main>
       </div>

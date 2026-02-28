@@ -63,3 +63,5 @@ tagsRoutes.delete('/:id', requireAdmin(), (c) => {
   tagsService.deleteTag(id);
   return c.json({ success: true });
 });
+
+export default tagsRoutes;
