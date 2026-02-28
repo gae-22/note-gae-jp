@@ -14,7 +14,7 @@ tokensRoutes.get('/note/:noteId', requireAdmin(), (c) => {
 
   const tokensWithUrl = tokens.map((t) => ({
     ...t,
-    shareUrl: `${env.FRONTEND_URL}/s/${t.id}`,
+    shareUrl: `${env.FRONTEND_URL}:${env.FRONTEND_PORT}/s/${t.id}`,
   }));
 
   return c.json({ success: true, data: { tokens: tokensWithUrl } });
@@ -44,7 +44,7 @@ tokensRoutes.post('/note/:noteId', requireAdmin(), async (c) => {
       data: {
         token: {
           ...token,
-          shareUrl: `${env.FRONTEND_URL}/s/${token.id}`,
+          shareUrl: `${env.FRONTEND_URL}:${env.FRONTEND_PORT}/s/${token.id}`,
         },
       },
     },

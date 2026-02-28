@@ -17,7 +17,7 @@ const app = new Hono();
 app.use(
   '*',
   cors({
-    origin: env.FRONTEND_URL,
+    origin: `${env.FRONTEND_URL}:${env.FRONTEND_PORT}`,
     credentials: true,
   }),
 );
@@ -34,9 +34,9 @@ app.route('/api/public', publicRoutes);
 // Health check
 app.get('/api/health', (c) => c.json({ success: true, data: { status: 'ok' } }));
 
-console.log(`🚀 Backend running on http://localhost:${env.PORT}`);
+console.log(`🚀 Backend running on ${env.BACKEND_URL}:${env.BACKEND_PORT}`);
 
 export default {
-  port: env.PORT,
+  port: env.BACKEND_PORT,
   fetch: app.fetch,
 };

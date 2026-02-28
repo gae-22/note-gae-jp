@@ -8,8 +8,10 @@ const envSchema = z.object({
   ADMIN_USERNAME: z.string().default('gae'),
   ADMIN_PASSWORD: z.string().min(1).default('change-me'),
   DATABASE_URL: z.string().default('./data/note-gae.db'),
-  PORT: z.coerce.number().default(3000),
-  FRONTEND_URL: z.string().default('http://localhost:5173'),
+  BACKEND_URL: z.string().default('http://localhost'),
+  BACKEND_PORT: z.coerce.number().default(3000),
+  FRONTEND_URL: z.string().default('http://localhost'),
+  FRONTEND_PORT: z.coerce.number().default(5173),
 });
 
 export type Env = z.infer<typeof envSchema>;
