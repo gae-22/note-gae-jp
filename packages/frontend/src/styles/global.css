@@ -1,6 +1,8 @@
 @import 'tailwindcss';
 @import 'highlight.js/styles/github-dark-dimmed.css';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* ── Neutral Colors (Zinc-based for modern feel) ── */
   --color-neutral-50: #fafafa;
