@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { renderMarkdown } from '@/lib/markdown';
 import type { NoteListItem } from '@note-gae/shared';
-import { LuArrowLeft, LuFileCode, LuCalendar, LuLoader } from 'react-icons/lu';
+import { LuArrowLeft, LuFileCode, LuCalendar, LuLoader, LuDownload } from 'react-icons/lu';
 import { GrainOverlay, MeshGradient } from '../../ui/decorative';
 
 export function PublicNoteDetailPage() {
@@ -57,17 +57,26 @@ export function PublicNoteDetailPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 font-body text-zinc-900 dark:text-zinc-50 transition-colors duration-500">
       {/* Background */}
-      <div className="fixed inset-0 pointer-events-none"><MeshGradient /></div>
-      <GrainOverlay opacity={0.12} />
+      <div className="fixed inset-0 pointer-events-none no-print"><MeshGradient /></div>
+      <div className="no-print"><GrainOverlay opacity={0.12} /></div>
 
       {/* Sticky Header */}
-      <header className="sticky top-0 z-30 w-full border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-2xl backdrop-saturate-150">
+      <header className="sticky top-0 z-30 w-full border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white/70 dark:bg-zinc-950/70 backdrop-blur-2xl backdrop-saturate-150 no-print">
         <div className="mx-auto flex h-14 max-w-4xl items-center justify-between px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <LuArrowLeft size={16} className="text-zinc-400 group-hover:text-indigo-500 transition-colors" />
-            <span className="font-heading font-semibold text-sm text-zinc-600 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">Archive</span>
-          </Link>
-          <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400 hidden sm:block">Public Document</span>
+          <div className="flex items-center gap-4">
+            <Link to="/" className="flex items-center gap-2.5 group">
+              <LuArrowLeft size={16} className="text-zinc-400 group-hover:text-indigo-500 transition-colors" />
+              <span className="font-heading font-semibold text-sm text-zinc-600 dark:text-zinc-300 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors">Archive</span>
+            </Link>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-400 hidden sm:block">Public Document</span>
+          </div>
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-colors"
+          >
+            <LuDownload size={14} />
+            <span className="hidden sm:inline">PDF出力</span>
+          </button>
         </div>
         <div className="h-px bg-linear-to-r from-transparent via-indigo-500/25 to-transparent" />
       </header>
@@ -114,7 +123,7 @@ export function PublicNoteDetailPage() {
         </article>
 
         {/* Footer */}
-        <footer className="mt-20 border-t border-zinc-200 dark:border-zinc-800 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-[11px] font-mono text-zinc-400 tracking-wider">
+        <footer className="mt-20 border-t border-zinc-200 dark:border-zinc-800 pt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-[11px] font-mono text-zinc-400 tracking-wider no-print">
           <span>note.gae // 2026</span>
           <Link to="/" className="hover:text-indigo-500 transition-colors">Return Home</Link>
         </footer>

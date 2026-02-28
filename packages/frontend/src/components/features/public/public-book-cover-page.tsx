@@ -1,7 +1,7 @@
 import { useNavigate, Link, useParams } from '@tanstack/react-router';
 import { useBook } from '@/hooks/use-books';
 import { useTheme } from '@/hooks/use-theme';
-import { LuBookOpen, LuMoon, LuSun, LuArrowLeft, LuClock, LuFileText } from 'react-icons/lu';
+import { LuBookOpen, LuMoon, LuSun, LuArrowLeft, LuClock, LuFileText, LuDownload } from 'react-icons/lu';
 
 export function PublicBookCoverPage() {
   const { slug } = useParams({ strict: false }) as { slug: string };
@@ -71,12 +71,20 @@ export function PublicBookCoverPage() {
              </div>
 
              {chapters.length > 0 && (
-               <div className="mt-12">
+               <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
                  <Link
                    to={`/books/${book.slug}/${chapters[0].id}` as any}
-                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-8 py-4 text-base font-bold text-white shadow-[0_8px_20px_-4px_rgba(99,102,241,0.5)] hover:shadow-[0_12px_28px_-6px_rgba(99,102,241,0.6)] hover:-translate-y-1 active:translate-y-0 transition-all"
+                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-indigo-500 to-indigo-600 px-8 py-4 text-base font-bold text-white shadow-[0_8px_20px_-4px_rgba(99,102,241,0.5)] hover:shadow-[0_12px_28px_-6px_rgba(99,102,241,0.6)] hover:-translate-y-1 active:translate-y-0 transition-all w-full sm:w-auto"
                  >
                    Start Reading
+                 </Link>
+                 <Link
+                   to={`/books/${book.slug}/print` as any}
+                   target="_blank"
+                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-white dark:bg-zinc-800 px-6 py-4 text-base font-bold text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 shadow-sm hover:border-indigo-500/50 hover:text-indigo-600 dark:hover:text-indigo-400 hover:-translate-y-1 active:translate-y-0 transition-all w-full sm:w-auto"
+                 >
+                   <LuDownload size={18} />
+                   本をPDF出力
                  </Link>
                </div>
              )}

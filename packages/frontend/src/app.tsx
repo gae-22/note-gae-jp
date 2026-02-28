@@ -10,6 +10,7 @@ import { PublicNoteDetailPage } from './components/features/public/public-note-d
 import { PublicBooksPage } from './components/features/public/public-books-page';
 import { PublicBookCoverPage } from './components/features/public/public-book-cover-page';
 import { PublicBookChapterPage } from './components/features/public/public-book-chapter-page';
+import { PublicBookPrintPage } from './components/features/public/public-book-print-page';
 import { BookEditorPage } from './components/features/books/book-editor-page';
 
 const queryClient = new QueryClient({
@@ -78,6 +79,12 @@ const publicBookChapterRoute = createRoute({
   component: PublicBookChapterPage,
 });
 
+const publicBookPrintRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/books/$slug/print',
+  component: PublicBookPrintPage,
+});
+
 const publicNoteRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/notes/$noteId',
@@ -99,6 +106,7 @@ const routeTree = rootRoute.addChildren([
   publicIndexRoute,
   publicBooksRoute,
   publicBookCoverRoute,
+  publicBookPrintRoute,
   publicBookChapterRoute,
   publicNoteRoute,
   bookEditorRoute,

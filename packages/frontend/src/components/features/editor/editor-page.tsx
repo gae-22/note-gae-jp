@@ -17,6 +17,7 @@ import {
   LuSettings,
   LuTrash2,
   LuDownload,
+  LuPrinter,
 } from 'react-icons/lu';
 
 type ViewMode = 'editor' | 'preview' | 'split';
@@ -176,7 +177,10 @@ export function EditorPage() {
             <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 hidden sm:block" />
 
             <div className="flex items-center gap-1">
-              <button onClick={handleExportMd} className="text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 rounded-lg p-2 transition-colors" title="Export">
+              <button onClick={() => window.print()} className="text-zinc-500 hover:bg-zinc-100 hover:text-indigo-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-indigo-400 rounded-lg p-2 transition-colors" title="PDF出力">
+                <LuPrinter size={18} />
+              </button>
+              <button onClick={handleExportMd} className="text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 rounded-lg p-2 transition-colors" title="Export Markdown">
                 <LuDownload size={18} />
               </button>
               <button onClick={() => { if (confirm('Delete this document?')) deleteMutation.mutate(); }} className="text-zinc-500 hover:bg-red-50 hover:text-red-600 dark:text-zinc-400 dark:hover:bg-red-900/20 dark:hover:text-red-400 rounded-lg p-2 transition-colors" title="Delete">
@@ -200,22 +204,22 @@ export function EditorPage() {
       </header>
 
       {/* ─── Title Input ─── */}
-      <div className="w-full border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-950 px-6 sm:px-8 py-5 shrink-0">
-        <div className="mx-auto max-w-4xl">
+      <div className="w-full border-b border-zinc-200/60 dark:border-zinc-800/60 bg-white dark:bg-zinc-950 px-6 sm:px-8 py-5 shrink-0 print:border-none print:py-2">
+        <div className="mx-auto max-w-4xl print:max-w-3xl">
           <input
             type="text"
             value={title}
             onChange={(e) => handleTitleChange(e.target.value)}
             placeholder="Document Title..."
-            className="w-full bg-transparent font-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:outline-none"
+            className="w-full bg-transparent font-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-300 dark:placeholder:text-zinc-600 focus:outline-none print:text-black print:pb-4 print:border-b print:border-zinc-200"
           />
         </div>
       </div>
 
       {/* ─── Editor / Preview ─── */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden relative print:overflow-visible print:block">
         {(viewMode === 'editor' || viewMode === 'split') && (
-          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col bg-white dark:bg-zinc-950 relative`}>
+          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} flex flex-col bg-white dark:bg-zinc-950 relative print:hidden`}>
             {viewMode === 'split' && (
               <div className="absolute top-0 right-0 bottom-0 w-px bg-linear-to-b from-transparent via-indigo-500/15 to-transparent z-10" />
             )}
@@ -223,8 +227,8 @@ export function EditorPage() {
           </div>
         )}
         {(viewMode === 'preview' || viewMode === 'split') && (
-          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-zinc-50 dark:bg-zinc-900/50 overflow-y-auto`}>
-            <div className="mx-auto max-w-3xl p-8 sm:p-12">
+          <div className={`${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-zinc-50 dark:bg-zinc-900/50 overflow-y-auto print:w-full print:bg-white print:overflow-visible`}>
+            <div className="mx-auto max-w-3xl p-8 sm:p-12 print:p-0">
               <PreviewPane content={content} />
             </div>
           </div>

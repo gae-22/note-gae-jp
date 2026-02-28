@@ -14,7 +14,8 @@ import {
   LuSettings2,
   LuGripVertical,
   LuFileText,
-  LuCheck
+  LuCheck,
+  LuDownload
 } from 'react-icons/lu';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
@@ -129,6 +130,17 @@ export function BookEditorPage() {
           </div>
 
           <div className="flex items-center gap-2 ml-auto shrink-0">
+            <a
+              href={`/books/${book.slug}/print`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-zinc-500 hover:bg-zinc-100 hover:text-indigo-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-indigo-400 rounded-lg p-2 transition-colors flex items-center gap-2"
+              title="本をPDF出力"
+            >
+              <LuDownload size={18} />
+              <span className="hidden sm:inline text-sm font-medium">PDF出力</span>
+            </a>
+            <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-800 mx-1" />
             <button
               onClick={() => setIsEditingSettings(!isEditingSettings)}
               className={`text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 rounded-lg p-2 transition-colors ${isEditingSettings ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50' : ''}`}

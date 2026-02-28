@@ -2,7 +2,7 @@ import { useParams, useNavigate, Link } from '@tanstack/react-router';
 import { useBook } from '@/hooks/use-books';
 import { useTheme } from '@/hooks/use-theme';
 import { renderMarkdown } from '@/lib/markdown';
-import { LuMenu, LuMoon, LuSun, LuChevronLeft, LuChevronRight, LuBook, LuArrowLeft } from 'react-icons/lu';
+import { LuMenu, LuMoon, LuSun, LuChevronLeft, LuChevronRight, LuBook, LuArrowLeft, LuDownload } from 'react-icons/lu';
 import { useState, useEffect } from 'react';
 
 export function PublicBookChapterPage() {
@@ -77,6 +77,24 @@ export function PublicBookChapterPage() {
           </div>
 
           <div className="flex items-center gap-2 ml-auto shrink-0">
+            <Link
+              to={`/books/${book.slug}/print` as any}
+              target="_blank"
+              title="本をPDF出力"
+              className="text-zinc-500 hover:bg-zinc-100 hover:text-indigo-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-indigo-400 rounded-lg p-2 transition-colors hidden sm:flex items-center gap-2 text-sm font-medium"
+            >
+              <LuDownload size={16} />
+              <span>PDF出力</span>
+            </Link>
+            <Link
+              to={`/books/${book.slug}/print` as any}
+              target="_blank"
+              title="本をPDF出力"
+              className="text-zinc-500 hover:bg-zinc-100 hover:text-indigo-600 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-indigo-400 rounded-lg p-2 transition-colors sm:hidden"
+            >
+              <LuDownload size={18} />
+            </Link>
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block" />
             <button onClick={toggleTheme} className="text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50 rounded-lg p-2 transition-colors">
               {isDark ? <LuMoon size={18} /> : <LuSun size={18} />}
             </button>

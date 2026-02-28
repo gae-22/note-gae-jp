@@ -678,3 +678,94 @@ code, pre {
   accent-color: var(--color-accent-600);
   margin-right: 0.5rem;
 }
+
+/* ═══════════════════════════════════════
+   Print Styles (PDF Export)
+   ═══════════════════════════════════════ */
+@media print {
+  /* Reset background and text colors for clean printing */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+  }
+
+  .dark {
+    --color-bg-primary: white !important;
+    --color-bg-secondary: white !important;
+    --color-text-primary: black !important;
+    --color-text-secondary: #333 !important;
+    --color-border-subtle: #ddd !important;
+  }
+
+  /* Utility class to hide UI elements during print */
+  .no-print {
+    display: none !important;
+  }
+
+  /* Specific elements to hide automatically */
+  header, footer, nav, button {
+    display: none !important;
+  }
+
+  /* Prose specific print adjustments */
+  .prose-void {
+    color: black !important;
+    font-size: 10pt !important;
+    line-height: 1.4 !important;
+  }
+
+  .prose-void h1, .prose-void h2, .prose-void h3 {
+    color: black !important;
+    page-break-after: avoid;
+    margin-top: 1.2em !important;
+    margin-bottom: 0.4em !important;
+  }
+
+  .prose-void h1 { font-size: 16pt !important; padding-bottom: 0.2rem !important; }
+  .prose-void h2 { font-size: 13pt !important; padding-bottom: 0.2rem !important; }
+  .prose-void h3 { font-size: 11pt !important; }
+
+  .prose-void p, .prose-void li {
+    color: #333 !important;
+    margin-top: 0.4em !important;
+    margin-bottom: 0.4em !important;
+  }
+
+  .prose-void ul, .prose-void ol {
+    margin: 0.4rem 0 !important;
+  }
+
+  /* Handle code blocks in print */
+  .prose-void pre, .prose-void .code-block-container {
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    background: #fdfdfd !important;
+    color: black !important;
+    padding: 0.75rem !important;
+    margin: 0.75em 0 !important;
+  }
+
+  .prose-void pre code {
+    font-size: 8.5pt !important;
+  }
+
+  /* Prevent cutting images in half */
+  .prose-void img {
+    page-break-inside: avoid;
+    max-height: 90vh; /* Ensure images fit on page */
+  }
+
+  /* Links should not be styled distinctively in print unless useful */
+  .prose-void a {
+    text-decoration: none !important;
+    color: black !important;
+    border-bottom: auto !important;
+  }
+
+  /* Add page breaks where explicitly requested */
+  .page-break {
+    page-break-before: always;
+  }
+}
