@@ -1,0 +1,82 @@
+# ==========================================
+# 環境変数・シークレット（※最重要）
+# ==========================================
+.env
+.env.*
+!.env.example
+
+# ==========================================
+# フロントエンド (Next.js 15+ / pnpm)
+# ==========================================
+# 依存関係
+node_modules/
+frontend/node_modules/
+.pnp
+.pnp.js
+
+# Next.js ビルド出力
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.swc/
+
+# ログ・カバレッジ
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+frontend/coverage/
+
+# ==========================================
+# バックエンド (Python 3.14 / FastAPI / uv)
+# ==========================================
+# 仮想環境 (uv)
+backend/.venv/
+backend/venv/
+backend/env/
+
+# コンパイル済みファイル
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# テスト・品質管理キャッシュ (pytest, Ruff, ty)
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+backend/.ruff_cache/
+backend/.mypy_cache/
+backend/.ty_cache/
+
+# ==========================================
+# インフラ・データベース (Docker)
+# ==========================================
+# ローカルDBのマウントデータ（volumeをバインドマウントした場合の備え）
+postgres_data/
+pgdata/
+db_data/
+
+# ==========================================
+# OS / エディタ共通
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# エディタ (VS Code, IntelliJなど)
+.idea/
+*.swp
+*.swo
+
+# 【重要】VS Codeのワークスペース設定は共有するため、
+# settings.json は除外しつつ、個人の状態ファイルのみ無視する
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
