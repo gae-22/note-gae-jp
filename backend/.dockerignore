@@ -1,0 +1,40 @@
+# backend/.dockerignore
+
+# Git
+.git
+.gitignore
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables & Secrets
+.env
+.env.*
+!.env.example
+secrets/
+
+# Testing, Linting & Type Checking
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.ty_cache/
+.mypy_cache/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Docker
+Dockerfile
+.dockerignore

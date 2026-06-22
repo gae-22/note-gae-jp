@@ -1,0 +1,41 @@
+# Taskfile.yml
+version: '3'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+    silent: true
+
+  dev:
+    desc: "ローカル開発環境を起動（Hot Reload有効）"
+    cmds:
+      - docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+  prod:
+    desc: "本番環境を起動（最適化ビルド）"
+    cmds:
+      - docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+  down:
+    desc: "全コンテナとネットワークを停止・削除"
+    cmds:
+      - docker compose -f docker-compose.yml -f docker-compose.dev.yml -f docker-compose.prod.yml down
+
+  test:
+    desc: "E2Eテストとバックエンドの単体テストを実行"
+    cmds:
+      - cd frontend && pnpm playwright test
+      - docker compose exec backend pytest
+
+test:api:watch:
+    desc: "【バックエンド】pytestを監視モードで起動 (TDD用)"
+    cmds:
+      # pytest-watch (ptw) を使用して変更を検知
+      - docker compose exec backend ptw --runner "pytest -s -v"
+
+  test:ui:watch:
+    desc: "【フロントエンド】Vitestを監視モードで起動 (TDD用)"
+    cmds:
+      - cd frontend && pnpm vitest watch
+

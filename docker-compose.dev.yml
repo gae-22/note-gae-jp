@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  # 開発時はDBクライアント(DBeaverなど)から繋げるようにポートを開放
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      target: dev
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000" # Swagger UI アクセス用
+
+  frontend:
+    build:
+      target: dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # ホスト側の空フォルダによる上書き防止
+      - /app/.next
+    ports:
+      - "3000:3000"

@@ -1,0 +1,41 @@
+# frontend/.dockerignore
+
+# Git
+.git
+.gitignore
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local build / Next.js cache
+.next/
+out/
+build/
+.swc/
+
+# Environment variables & Secrets
+.env
+.env.*
+!.env.example
+secrets/
+
+# Testing & Coverage
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Docker
+Dockerfile
+.dockerignore

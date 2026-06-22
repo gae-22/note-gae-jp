@@ -1,0 +1,21 @@
+version: "3.8"
+
+services:
+  db:
+    restart: always
+    # ポートは公開しない（Docker内部ネットワークのみで通信）
+
+  redis:
+    restart: always
+
+  backend:
+    build:
+      target: runner
+    restart: always
+
+  frontend:
+    build:
+      target: runner
+    restart: always
+    ports:
+      - "3000:3000" # 本番はフロントエンドのみ公開
