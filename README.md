@@ -202,6 +202,50 @@ CREATE TABLE entry_tag (
 );
 ```
 
+```mermaid
+erDiagram
+    account ||--o{ entry : "1対多: 所有する"
+    account ||--o{ tag : "1対多: 作成する"
+    entry ||--o{ entry_tag : "1対多: 紐づく"
+    tag ||--o{ entry_tag : "1対多: 紐づく"
+
+    account {
+        uuid id PK "デフォルト: gen_random_uuid()"
+        varchar email UK "NOT NULL"
+        varchar password_hash "NOT NULL"
+        varchar display_name "NOT NULL (Def: 名無しユーザー)"
+        timestamptz created_at "NOT NULL"
+        timestamptz updated_at "NOT NULL"
+        timestamptz deleted_at "論理削除用"
+    }
+
+    entry {
+        bigint id PK "IDENTITY"
+        uuid account_id FK "NOT NULL"
+        varchar title "NOT NULL"
+        text content "NOT NULL (pg_trgm インデックス)"
+        varchar status "NOT NULL (Def: published)"
+        boolean is_pinned "NOT NULL (Def: false)"
+        timestamptz created_at "NOT NULL"
+        timestamptz updated_at "NOT NULL"
+        timestamptz deleted_at "論理削除用"
+    }
+
+    tag {
+        bigint id PK "IDENTITY"
+        uuid account_id FK "NOT NULL"
+        varchar name "NOT NULL (account_idと複合ユニーク)"
+        varchar color_code "NOT NULL (Def: #808080)"
+        timestamptz created_at "NOT NULL"
+    }
+
+    entry_tag {
+        bigint entry_id PK, FK "NOT NULL"
+        bigint tag_id PK, FK "NOT NULL"
+        timestamptz created_at "NOT NULL"
+    }
+```
+
 ---
 
 ## 8. インフラ・コンテナ最適化設計
