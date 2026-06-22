@@ -1,0 +1,40 @@
+name: CI Pipeline
+on: [push, pull_request]
+
+jobs:
+  frontend-ci:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ./frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: corepack enable pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm build
+
+  backend-ci:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: ./backend } }
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env: { POSTGRES_USER: test_user, POSTGRES_PASSWORD: test_password, POSTGRES_DB: test_db }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+      SECRET_KEY: ci-test-super-secret-key-2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.14' }
+      - run: uv pip install --system fastapi uvicorn sqlalchemy psycopg2-binary asyncpg alembic pydantic-settings ruff ty pytest httpx
+      - run: uv run ruff format --check .
+      - run: uv run ruff check .
+      - run: uv run ty .
+      - run: uv run pytest
