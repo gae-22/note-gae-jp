@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "ms-python.python",        // Python公式サポート
+    "ms-python.vscode-pylance", // 高度な型推論・静的解析
+    "charliermarsh.ruff",      // 超高速Python Lint/Formatter (Ruff)
+    "bmewburn.vscode-intelephense-client",
+    "esbenp.prettier-vscode",  // フロントエンド用Formatter (Prettier)
+    "dbaeumer.vscode-eslint",   // フロントエンド用Lint (ESLint)
+    "uuid.vscode-uuid-generator", // 開発中にあると便利なUUID生成ツール
+    "hediet.vscode-mermaid-previewer" // Mermaid図のプレビュー用
+  ]
+}
