@@ -170,7 +170,7 @@ CREATE TABLE entry (
     account_id UUID NOT NULL,
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'published',
+    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('published', 'draft', 'archived')),
     is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
