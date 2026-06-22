@@ -11,9 +11,11 @@ jobs:
         with: { node-version: '22' }
       - run: corepack enable pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint
-      - run: pnpm test
-      - run: pnpm build
+      - run: pnpm lint && pnpm test && pnpm build
+      - name: Install Playwright Browsers
+        run: pnpm playwright install --with-deps
+      - name: Run E2E Tests
+        run: pnpm playwright test
 
   backend-ci:
     runs-on: ubuntu-latest
@@ -25,16 +27,16 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
     env:
       DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
-      SECRET_KEY: ci-test-super-secret-key-2026
+      REDIS_HOST: localhost
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - uses: actions/setup-python@v5
         with: { python-version: '3.14' }
-      - run: uv pip install --system fastapi uvicorn sqlalchemy psycopg2-binary asyncpg alembic pydantic-settings ruff ty pytest httpx
-      - run: uv run ruff format --check .
-      - run: uv run ruff check .
-      - run: uv run ty .
-      - run: uv run pytest
+      - run: uv pip install --system fastapi uvicorn sqlalchemy psycopg2-binary asyncpg alembic pydantic-settings ruff ty pytest httpx redis structlog
+      - run: uv run ruff format --check . && uv run ruff check . && uv run ty . && uv run pytest
