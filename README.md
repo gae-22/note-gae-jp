@@ -145,104 +145,157 @@ VS Codeと同じエンジンである **Monaco Editor** を統合し、リアル
 サロゲートキー、論理削除、自動タイムスタンプ更新に加え、高速全文検索（pg_trgm）を備えたエンタープライズ対応のテーブル定義。
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- ==============================================================================
+-- 1. EXTENSIONS
+-- ==============================================================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
-CREATE OR REPLACE FUNCTION update_updated_at_column() RETURNS TRIGGER AS $$
+-- ==============================================================================
+-- 2. UTILITIES
+-- ==============================================================================
+-- 更新日時自動更新用の汎用関数
+CREATE OR REPLACE FUNCTION fn_update_timestamp() 
+RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
-CREATE TABLE account (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    display_name VARCHAR(50) NOT NULL DEFAULT '名無しユーザー',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at TIMESTAMPTZ
+-- ==============================================================================
+-- 3. TABLES (with explicit Constraints & Indexes)
+-- ==============================================================================
+
+-- ACCOUNTS: ユーザー管理
+CREATE TABLE accounts (
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email         TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    display_name  TEXT NOT NULL DEFAULT '名無し',
+    is_admin      BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at    TIMESTAMPTZ,
+
+    CONSTRAINT chk_email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
 );
-CREATE TRIGGER update_account_modtime BEFORE UPDATE ON account FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER trg_accounts_updated_at BEFORE UPDATE ON accounts 
+    FOR EACH ROW EXECUTE FUNCTION fn_update_timestamp();
 
-CREATE TABLE entry (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+-- ENTRIES: 日記エントリー
+CREATE TABLE entries (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     account_id UUID NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    content TEXT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('published', 'draft', 'archived')),
-    is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    title      TEXT NOT NULL,
+    content    TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'draft',
+    is_pinned  BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ,
-    CONSTRAINT fk_entry_account FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE
-);
-CREATE INDEX idx_entry_account_id ON entry(account_id);
--- 全文検索用 GIN インデックス
-CREATE INDEX idx_entry_content_trgm ON entry USING gin (content gin_trgm_ops);
-CREATE TRIGGER update_entry_modtime BEFORE UPDATE ON entry FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TABLE tag (
-    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    CONSTRAINT fk_entries_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+    CONSTRAINT chk_status_enum CHECK (status IN ('published', 'draft', 'archived'))
+);
+CREATE INDEX idx_entries_active_lookup ON entries(account_id, created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX idx_entries_content_trgm  ON entries USING gin (content gin_trgm_ops);
+CREATE TRIGGER trg_entries_updated_at BEFORE UPDATE ON entries 
+    FOR EACH ROW EXECUTE FUNCTION fn_update_timestamp();
+
+-- TAGS: タグ定義
+CREATE TABLE tags (
+    id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     account_id UUID NOT NULL,
-    name VARCHAR(50) NOT NULL,
-    color_code VARCHAR(7) NOT NULL DEFAULT '#808080',
+    name       TEXT NOT NULL,
+    color_code TEXT NOT NULL DEFAULT '#808080',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_tag_account FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+
+    CONSTRAINT fk_tags_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
     CONSTRAINT uq_account_tag_name UNIQUE (account_id, name)
 );
 
-CREATE TABLE entry_tag (
+-- ENTRY_TAGS: 多対多リレーション
+CREATE TABLE entry_tags (
     entry_id BIGINT NOT NULL,
-    tag_id BIGINT NOT NULL,
+    tag_id   BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (entry_id, tag_id),
-    CONSTRAINT fk_entry_tag_entry BEFORE KEY (entry_id) REFERENCES entry(id) ON DELETE CASCADE,
-    CONSTRAINT fk_entry_tag_tag FOREIGN KEY (tag_id) REFERENCES tag(id) ON DELETE CASCADE
+
+    CONSTRAINT pk_entry_tags PRIMARY KEY (entry_id, tag_id),
+    CONSTRAINT fk_et_entry FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE,
+    CONSTRAINT fk_et_tag   FOREIGN KEY (tag_id)   REFERENCES tags(id)   ON DELETE CASCADE
 );
+
+-- AUDIT_LOGS: 管理操作ログ
+CREATE TABLE audit_logs (
+    id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    admin_id          UUID NOT NULL,
+    target_account_id UUID NOT NULL,
+    action            TEXT NOT NULL,
+    details           JSONB DEFAULT '{}',
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_audit_admin  FOREIGN KEY (admin_id) REFERENCES accounts(id),
+    CONSTRAINT fk_audit_target FOREIGN KEY (target_account_id) REFERENCES accounts(id)
+);
+CREATE INDEX idx_audit_logs_target ON audit_logs(target_account_id);
 ```
 
 ```mermaid
 erDiagram
-    account ||--o{ entry : "1対多: 所有する"
-    account ||--o{ tag : "1対多: 作成する"
-    entry ||--o{ entry_tag : "1対多: 紐づく"
-    tag ||--o{ entry_tag : "1対多: 紐づく"
+    %% IDEF1X: Entities and Relationships
+    ACCOUNTS ||--o{ ENTRIES : "管理する"
+    ACCOUNTS ||--o{ TAGS : "作成する"
+    ACCOUNTS ||--o{ AUDIT_LOGS : "操作主(admin)"
+    ACCOUNTS ||--o{ AUDIT_LOGS : "操作対象(target)"
+    
+    ENTRIES ||--o{ ENTRY_TAGS : "包含される"
+    TAGS ||--o{ ENTRY_TAGS : "包含される"
 
-    account {
-        uuid id PK "デフォルト: gen_random_uuid()"
-        varchar email UK "NOT NULL"
-        varchar password_hash "NOT NULL"
-        varchar display_name "NOT NULL (Def: 名無しユーザー)"
-        timestamptz created_at "NOT NULL"
-        timestamptz updated_at "NOT NULL"
-        timestamptz deleted_at "論理削除用"
+    ACCOUNTS {
+        uuid id PK
+        text email
+        text password_hash
+        text display_name
+        boolean is_admin
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
     }
 
-    entry {
-        bigint id PK "IDENTITY"
-        uuid account_id FK "NOT NULL"
-        varchar title "NOT NULL"
-        text content "NOT NULL (pg_trgm インデックス)"
-        varchar status "NOT NULL (Def: published)"
-        boolean is_pinned "NOT NULL (Def: false)"
-        timestamptz created_at "NOT NULL"
-        timestamptz updated_at "NOT NULL"
-        timestamptz deleted_at "論理削除用"
+    ENTRIES {
+        bigint id PK
+        uuid account_id FK
+        text title
+        text content
+        text status
+        boolean is_pinned
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
     }
 
-    tag {
-        bigint id PK "IDENTITY"
-        uuid account_id FK "NOT NULL"
-        varchar name "NOT NULL (account_idと複合ユニーク)"
-        varchar color_code "NOT NULL (Def: #808080)"
-        timestamptz created_at "NOT NULL"
+    TAGS {
+        bigint id PK
+        uuid account_id FK
+        text name
+        text color_code
+        timestamptz created_at
     }
 
-    entry_tag {
-        bigint entry_id PK, FK "NOT NULL"
-        bigint tag_id PK, FK "NOT NULL"
-        timestamptz created_at "NOT NULL"
+    ENTRY_TAGS {
+        bigint entry_id PK, FK
+        bigint tag_id PK, FK
+        timestamptz created_at
+    }
+
+    AUDIT_LOGS {
+        bigint id PK
+        uuid admin_id FK
+        uuid target_account_id FK
+        text action
+        jsonb details
+        timestamptz created_at
     }
 ```
 
