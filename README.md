@@ -1,38 +1,42 @@
 # 個人用メモ・日記アプリ
 
 日常の気付きや技術的な学びを記録するための個人用メモ・日記Webアプリケーションです。
-実務のベストプラクティス（徹底した型安全、第3正規形DB、環境別コンテナ運用、自動テスト）と、海外の最新SaaSに見られる極限まで洗練されたUI/UXデザインを融合させた、エンタープライズ品質のプロダクトとして設計されています。
+実務のベストプラクティス（徹底した型安全、第3正規形DB、環境別コンテナ運用、自動テスト、オブザーバビリティ）と、海外の最新SaaSに見られる極限まで洗練されたUI/UXデザインを融合させた、エンタープライズ品質のプロダクトとして設計されています。
 
 ---
 
 ## 1. プロジェクトの特長と最適化ポイント
 
-* **極限の開発者体験と型安全**: フロントエンドからバックエンド、インフラに至るまで、静的解析と自動フォーマットを徹底。
-* **エンタープライズ級のパフォーマンス**:
-  * **バックエンド**: FastAPI + SQLAlchemy 2.0による**完全非同期(Async)アーキテクチャ**。
-  * **データベース**: `pg_trgm` を用いたN-gramベースの**高速全文検索インデックス**。
+* **極限の開発者体験と型安全**: フロントエンドからバックエンド、インフラに至るまで、静的解析、自動フォーマット、型推論を徹底。
+* **エンタープライズ級のパフォーマンスとデータ保護**:
+  * **バックエンド**: FastAPI + SQLAlchemy 2.0による**完全非同期(Async)アーキテクチャ**。さらに、`structlog`による構造化ログとRequest IDトラッキングを搭載。
+  * **データベース**: PostgreSQL 18 の**行レベルセキュリティ (RLS: Row Level Security)** を有効化。アプリ層のバグによるデータ漏洩をDBレイヤーで物理的にシャットアウト。
+  * **高速日本語検索**: `pg_bigm` (2-gram) を用いた高速な日本語全文検索インデックス。
   * **フロントエンド**: `TanStack Query` を用いた楽観的UI更新(Optimistic Updates)による遅延ゼロ体験。`next/dynamic` によるMonaco Editorの遅延読み込み(Lazy Loading)。
-* **本番水準のインフラ構築**:
+* **本番水準のインフラとセキュリティ**:
+  * Docker Composeにおける **Docker Secrets** を活用した、環境変数に依存しない安全なシークレット情報のマウント。
+  * セッション・JWTブラックリスト管理用に高速な **Redis** コンテナを統合。
   * マルチステージビルドによる**100MB台の超軽量・非root実行コンテナ**。
-  * DBの起動完了を待つ `healthcheck` を搭載した堅牢な `docker-compose` 構成。
-* **CI/CD 完全自動化**: GitHub ActionsによるLint、型チェック、コンテナDBを用いた結合テストの**並列自動実行**。
+* **CI/CD & テスト完全自動化**: GitHub ActionsによるLint、型チェックに加え、PlaywrightによるE2EテストおよびコンテナDBを用いた結合テストの並列自動実行。
 
 ---
 
 ## 2. 技術スタック
 
 * **フロントエンド**
-  * **Framework:** Next.js 15+ (TypeScript / App Router / Standalone Build)
-  * **UI / State:** MUI (Material-UI) / React Hooks / TanStack Query
+  * **Framework:** Next.js 15+ (TypeScript 5+ / App Router / Standalone Build)
+  * **UI / State:** MUI (Material-UI) / React Hooks / TanStack Query v5
   * **Editor:** `@monaco-editor/react`, `react-markdown`, `remark-gfm`
-  * **Quality:** pnpm / ESLint / Prettier / Vitest
+  * **Quality / Testing:** pnpm / ESLint / Prettier / Playwright (E2E) / Vitest
 * **バックエンド**
   * **Framework:** FastAPI (Python 3.14)
+  * **Cache / Session:** Redis 7-alpine (JWT無効化・セッションストア)
   * **ORM / DB:** SQLAlchemy 2.0 (Async) / PostgreSQL 18
-  * **Quality:** uv / Ruff / ty / pytest
+  * **Quality / Logging:** uv / Ruff / ty / pytest / structlog
 * **インフラ / DevOps**
-  * **Container:** Docker / Docker Compose
-  * **CI/CD:** GitHub Actions
+  * **Container:** Docker / Docker Compose (Docker Secrets対応)
+  * **CI/CD:** GitHub Actions (Lint, Test, Build, E2E)
+
 ---
 
 ## 3. システムアーキテクチャ（ディレクトリ構成）
@@ -44,11 +48,16 @@ my-diary-app/
 ├── backend/                  # FastAPI (Python 3.14)
 │   ├── app/                  
 │   │   ├── api/              # エンドポイント
-│   │   ├── core/             # 設定(pydantic-settings)・例外処理
+│   │   │   ├── v1/
+│   │   │   │   ├── auth.py   # 認証関連（JWT、ログアウト対応）
+│   │   │   │   ├── entries.py# エントリー（CRUD、エクスポート対応）
+│   │   │   │   ├── tags.py   # タグ管理
+│   │   │   │   └── admin.py  # 管理者用API（監査ログ生成）
+│   │   ├── core/             # 設定・共通例外ハンドラ・structlog設定
 │   │   ├── crud/             # DB操作 (非同期CRUD)
-│   │   ├── db/               # DB接続設定 (AsyncSession)
-│   │   ├── models/           # DBモデル
-│   │   └── schemas/          # Pydantic型定義
+│   │   ├── db/               # DB接続設定 (AsyncSession, Redisクライアント)
+│   │   ├── models/           # DBモデル (SQLAlchemy 2.0 / Mapped)
+│   │   └── schemas/          # Pydantic型定義 (V2)
 │   ├── tests/                # テストコード (pytest)
 │   ├── pyproject.toml        # uv, ruff, ty 設定
 │   └── Dockerfile            # マルチステージ・非root化
@@ -59,12 +68,17 @@ my-diary-app/
 │   │   ├── hooks/            # カスタムフック (useAuth, useEntries)
 │   │   ├── lib/              # APIクライアント, theme.ts
 │   │   └── types/            # 型定義
-│   ├── __tests__/            # テストコード (Vitest)
+│   ├── __tests__/            # 単体テスト (Vitest)
+│   ├── e2e/                  # E2Eテスト (Playwright)
 │   ├── next.config.mjs       # バックエンドへのプロキシ・Standalone設定
 │   ├── package.json          
 │   └── Dockerfile            # マルチステージ・非root化
-├── .github/workflows/        # CI/CD自動化 (GitHub Actions)
-├── docker-compose.yml        # 開発用・DBヘルスチェック構成
+├── .github/workflows/        
+│   └── ci.yml                # CI/CD自動化 (GitHub Actions + Playwright)
+├── secrets/                  # ローカル開発用シークレットマウントディレクトリ
+│   ├── db_password.txt
+│   └── jwt_secret.txt
+├── docker-compose.yml        # 開発用・DBヘルスチェック・Redis連携・Secrets構成
 └── .gitignore                # プロジェクト全体のGit管理ルール
 ```
 
@@ -74,17 +88,21 @@ my-diary-app/
 
 フロントエンド（Next.js Rewrites）からプロキシ経由でアクセスされるバックエンドAPIのエンドポイント一覧です。
 
-| メソッド | エンドポイント | 説明 | 認証 |
-| --- | --- | --- | --- |
-| **POST** | `/api/v1/auth/register` | 新規ユーザー登録 | 不要 |
-| **POST** | `/api/v1/auth/token` | ログイン（JWT発行） | 不要 |
-| **GET** | `/api/v1/entries` | 日記一覧取得（カーソルベースPaging・全文検索対応） | 必要 |
-| **POST** | `/api/v1/entries` | 新規日記作成 | 必要 |
-| **GET** | `/api/v1/entries/{id}` | 特定日記の単一取得 | 必要 |
-| **PUT** | `/api/v1/entries/{id}` | 特定日記の更新 | 必要 |
-| **DELETE** | `/api/v1/entries/{id}` | 特定日記の削除（論理削除） | 必要 |
-| **GET** | `/api/v1/tags` | 登録済みタグ一覧取得 | 必要 |
-| **POST** | `/api/v1/tags` | 新規タグ作成 | 必要 |
+| メソッド | エンドポイント | 説明 | 認証 | ログ出力 |
+| --- | --- | --- | --- | --- |
+| **POST** | `/api/v1/auth/register` | 新規ユーザー登録 | 不要 | 構造化ログ |
+| **POST** | `/api/v1/auth/token` | ログイン（JWT・リフレッシュトークン発行） | 不要 | 構造化ログ |
+| **POST** | `/api/v1/auth/logout` | ログアウト（トークンをRedisブラックリストへ登録） | 必要 | 構造化ログ |
+| **GET** | `/api/v1/entries` | 日記一覧取得（カーソルベースPaging・全文検索対応） | 必要 | なし |
+| **POST** | `/api/v1/entries` | 新規日記作成 | 必要 | 構造化ログ |
+| **GET** | `/api/v1/entries/{id}` | 特定日記の単一取得 | 必要 | なし |
+| **PUT** | `/api/v1/entries/{id}` | 特定日記の更新 | 必要 | 構造化ログ |
+| **DELETE** | `/api/v1/entries/{id}` | 特定日記の削除（論理削除） | 必要 | 構造化ログ |
+| **GET** | `/api/v1/entries/export` | ユーザーの全日記データの一括エクスポート (Markdown/JSON) | 必要 | 構造化ログ |
+| **GET** | `/api/v1/tags` | 登録済みタグ一覧取得 | 必要 | なし |
+| **POST** | `/api/v1/tags` | 新規タグ作成 | 必要 | 構造化ログ |
+| **GET** | `/api/v1/admin/accounts` | 【管理者】全ユーザー一覧取得 | 管理者 | 監査ログ記録 |
+| **PUT** | `/api/v1/admin/accounts/{id}` | 【管理者】ユーザー情報の更新（論理削除・復活含む） | 管理者 | 監査ログ記録 |
 
 ---
 
@@ -140,16 +158,16 @@ VS Codeと同じエンジンである **Monaco Editor** を統合し、リアル
 
 ---
 
-## 7. データベース設計（PostgreSQL 18 DDL）
+## 7. データベース設計（PostgreSQL 18 DDL / RLS対応）
 
-サロゲートキー、論理削除、自動タイムスタンプ更新に加え、高速全文検索（pg_trgm）を備えたエンタープライズ対応のテーブル定義。
+サロゲートキー、論理削除、自動タイムスタンプ更新、高速日本語全文検索（`pg_bigm`）、さらに安全性を究極まで高めた**行レベルセキュリティ (RLS)** を完全に組み込んだ実務水準のテーブル定義。
 
 ```sql
 -- ==============================================================================
--- 1. EXTENSIONS
+-- 1. EXTENSIONS & SETTINGS
 -- ==============================================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pg_bigm"; -- 日本語全文検索用(2-gram)
 
 -- ==============================================================================
 -- 2. UTILITIES
@@ -164,7 +182,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ==============================================================================
--- 3. TABLES (with explicit Constraints & Indexes)
+-- 3. TABLES
 -- ==============================================================================
 
 -- ACCOUNTS: ユーザー管理
@@ -198,8 +216,9 @@ CREATE TABLE entries (
     CONSTRAINT fk_entries_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
     CONSTRAINT chk_status_enum CHECK (status IN ('published', 'draft', 'archived'))
 );
+-- pg_bigm を使用した日本語全文検索インデックス
+CREATE INDEX idx_entries_content_search_gin ON entries USING gin (content gin_bigm_ops);
 CREATE INDEX idx_entries_active_lookup ON entries(account_id, created_at DESC) WHERE deleted_at IS NULL;
-CREATE INDEX idx_entries_content_trgm  ON entries USING gin (content gin_trgm_ops);
 CREATE TRIGGER trg_entries_updated_at BEFORE UPDATE ON entries 
     FOR EACH ROW EXECUTE FUNCTION fn_update_timestamp();
 
@@ -239,6 +258,29 @@ CREATE TABLE audit_logs (
     CONSTRAINT fk_audit_target FOREIGN KEY (target_account_id) REFERENCES accounts(id)
 );
 CREATE INDEX idx_audit_logs_target ON audit_logs(target_account_id);
+
+-- ==============================================================================
+-- 4. ROW LEVEL SECURITY (RLS) POLICIES
+-- ==============================================================================
+ALTER TABLE entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
+ALTER TABLE entry_tags ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY entries_user_policy ON entries
+    FOR ALL
+    USING (account_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid);
+
+CREATE POLICY tags_user_policy ON tags
+    FOR ALL
+    USING (account_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid);
+
+CREATE POLICY entry_tags_user_policy ON entry_tags
+    FOR ALL
+    USING (
+        entry_id IN (
+            SELECT id FROM entries WHERE account_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid
+        )
+    );
 ```
 
 ```mermaid
@@ -303,7 +345,7 @@ erDiagram
 
 ## 8. インフラ・コンテナ最適化設計
 
-セキュリティ（非root化）とパフォーマンス（マルチステージビルド）を極限まで高めた本番運用レベルのDocker構成。
+セキュリティ（Docker Secretsの活用・非root化）とパフォーマンス（Redisの統合、マルチステージビルド）を追求したプロダクション仕様の環境設計です。
 
 ### 8-1. フロントエンド (`frontend/Dockerfile`)
 
@@ -334,6 +376,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
+
 ```
 
 ### 8-2. バックエンド (`backend/Dockerfile`)
@@ -345,7 +388,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml ./
-RUN uv venv /opt/venv && uv pip install --python /opt/venv fastapi uvicorn sqlalchemy psycopg2-binary asyncpg alembic pydantic-settings ruff ty pytest httpx
+RUN uv venv /opt/venv && uv pip install --python /opt/venv fastapi uvicorn sqlalchemy psycopg2-binary asyncpg alembic pydantic-settings ruff ty pytest httpx redis structlog
 
 # 2. Runnerステージ (実行用軽量イメージ)
 FROM python:3.14-slim AS runner
@@ -358,43 +401,86 @@ USER appuser
 COPY . .
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
 ```
 
 ### 8-3. Docker Compose (`docker-compose.yml`)
 
-DBの起動完了を `pg_isready` で監視し、バックエンドの起動エラーを防ぐ堅牢な構成。
-
 ```yaml
+version: "3.8"
+
 services:
   db:
     image: postgres:18-alpine
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB: ${DB_NAME:-digital_zen_db}
+    secrets:
+      - db_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-digital_zen_db}"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass_file /run/secrets/redis_password
+    secrets:
+      - redis_password
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   backend:
     build: ./backend
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-postgres}@db:5432/${DB_NAME:-digital_zen_db}
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      - JWT_SECRET_FILE=/run/secrets/jwt_secret
+    secrets:
+      - db_password
+      - redis_password
+      - jwt_secret
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+
   frontend:
     build: ./frontend
+    ports:
+      - "3000:3000"
     depends_on:
       - backend
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+
+volumes:
+  postgres_data:
+  redis_data:
 ```
 
 ---
 
 ## 9. CI/CD 完全自動化パイプライン (GitHub Actions)
-
-コードのプッシュ時に、フロントエンドとバックエンドの静的解析・ビルド・結合テストを**並列**で自動実行。
 
 **`.github/workflows/ci.yml`**
 
@@ -413,6 +499,10 @@ jobs:
       - run: corepack enable pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint && pnpm test && pnpm build
+      - name: Install Playwright Browsers
+        run: pnpm playwright install --with-deps
+      - name: Run E2E Tests
+        run: pnpm playwright test
 
   backend-ci:
     runs-on: ubuntu-latest
@@ -424,39 +514,61 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
     env:
       DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/test_db
+      REDIS_HOST: localhost
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - uses: actions/setup-python@v5
         with: { python-version: '3.14' }
-      - run: uv pip install --system fastapi uvicorn sqlalchemy psycopg2-binary asyncpg alembic pydantic-settings ruff ty pytest httpx
+      - run: uv pip install --system fastapi uvicorn sqlalchemy psycopg2-binary asyncpg alembic pydantic-settings ruff ty pytest httpx redis structlog
       - run: uv run ruff format --check . && uv run ruff check . && uv run ty . && uv run pytest
 ```
 
 ---
 
-## 10. アプリケーション詳細設計（関数・型ブループリント）
+## 10. アプリケーション詳細設計
 
 ### 10-1. フロントエンド (TypeScript / Next.js 15+)
 
 * **型定義:** `EntryStatus`, `Entry`, `Account`, `Tag` などの厳密なインターフェースを定義。
 * **カスタムフック:**
-   * `useAuth()`: 認証状態とJWTトークンの管理。
-   * `useEntries(cursor, limit)`: TanStack Queryを用いた無限スクロールと楽観的更新対応データフェッチ。
-   * `useEntryDetail(id)`: 単一メモの取得・更新・削除処理。
+* `useAuth()`: 認証状態、JWTおよびRedisと連動するセッション無効化(ログアウト)処理。
+* `useEntries(cursor, limit)`: TanStack Queryを用いた無限スクロールと楽観的更新対応データフェッチ。
+* `useEntryDetail(id)`: 単一メモの取得・更新・削除処理。
 
+### 10-2. バックエンド (Python 3.14 / FastAPI - 非同期 Async 構成 & 構造化ロギング)
 
+```python
+import structlog
+import uuid
+from fastapi import Request, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 
-### 10-2. バックエンド (Python 3.14 / FastAPI - 非同期 Async 構成)
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.add_log_level,
+        structlog.processors.JSONRenderer()
+    ],
+    logger_factory=structlog.PrintLoggerFactory(),
+)
+logger = structlog.get_logger()
 
-* **Pydantic スキーマ:** `AccountCreate`, `EntryCreate`, `Token` 等による入出力の厳格なバリデーション。
-* **非同期 CRUD 操作:**
-   * `async def get_multi(db: AsyncSession, account_id: UUID, cursor: Optional[int] = None, limit: int = 50) -> List[Entry]`
-* **非同期 API ルーター:**
-   * `@router.get("/") async def read_entries(...) -> List[EntryResponse]`
-   * `@router.post("/") async def create_new_entry(...) -> EntryResponse`
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(request_id=request_id)
+        
+        response: Response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+```
 
 ---
 
@@ -467,6 +579,7 @@ jobs:
 .env
 .env.*
 !.env.example
+secrets/*.txt
 
 # フロントエンド (Next.js 15+ / pnpm)
 node_modules/
@@ -478,10 +591,9 @@ frontend/out/
 frontend/build/
 frontend/.swc/
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
 frontend/coverage/
+frontend/playwright-report/
 
 # バックエンド (Python 3.14 / FastAPI / uv)
 backend/.venv/
@@ -489,30 +601,18 @@ backend/venv/
 backend/env/
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
 backend/.pytest_cache/
 backend/.coverage
-backend/htmlcov/
 backend/.ruff_cache/
-backend/.mypy_cache/
 backend/.ty_cache/
 
 # インフラ・データベース (Docker)
 postgres_data/
-pgdata/
-db_data/
+redis_data/
 
 # OS / エディタ共通
 .DS_Store
-.AppleDouble
-.LSOverride
 Thumbs.db
-ehthumbs.db
-Desktop.ini
-.idea/
-*.swp
-*.swo
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
@@ -525,29 +625,28 @@ Desktop.ini
 ### 12-1. ローカル環境のセットアップ
 
 1. **リポジトリのクローン**
+
 ```bash
-git clone [https://github.com/your-username/my-diary-app.git](https://github.com/your-username/my-diary-app.git)
-cd my-diary-app
+git clone https://github.com/gae-22/note-gae-jp.git
+cd note-gae-jp
 ```
 
-2. **環境変数の設定**
+2. **シークレットファイルの作成 (Docker Secrets用)**
+
 ```bash
-cp .env.example .env.dev
-# .env.dev にデータベースのパスワードやJWTシークレットキーを設定
+mkdir -p secrets
+echo "my_super_secure_db_password" > secrets/db_password.txt
+echo "my_secure_redis_password" > secrets/redis_password.txt
+echo "my_jwt_session_secret_key" > secrets/jwt_secret.txt
 ```
 
 3. **Dockerコンテナのビルドと起動**
+
 ```bash
 docker compose up -d --build
 ```
 
-4. **動作確認**
-* フロントエンド: `http://localhost:3000`
-* バックエンド API: `http://localhost:8000`
-
 ### 12-2. データベースマイグレーション運用 (Alembic)
-
-テーブル定義を変更した際は、以下のコマンドでスキーマを同期します。
 
 ```bash
 # マイグレーションファイルの自動生成
@@ -558,8 +657,6 @@ docker compose exec backend alembic upgrade head
 ```
 
 ### 12-3. APIドキュメント (Swagger UI)
-
-FastAPIによって自動生成されるインタラクティブなAPI仕様書です。
 
 * **Swagger UI (テスト実行可能):** `http://localhost:8000/docs`
 * **ReDoc (仕様確認用):** `http://localhost:8000/redoc`
