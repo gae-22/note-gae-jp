@@ -1,16 +1,10 @@
 {
-  // ==========================================
-  // 1. GENERAL EDITOR SETTINGS
-  // ==========================================
   "editor.renderWhitespace": "selection",
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
 
-  // ==========================================
-  // 2. FRONTEND (TypeScript / Next.js) CONFIG
-  // ==========================================
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
@@ -33,32 +27,22 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true
   },
-
-  // ==========================================
-  // 3. BACKEND (Python / FastAPI) CONFIG
-  // ==========================================
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff",
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {
-      // 保存時にRuffでフォーマット、ルールチェック、インポート順(Isort)の整理を同時に実行
       "source.fixAll.ruff": "explicit",
       "source.organizeImports.ruff": "explicit"
     }
   },
-  "python.analysis.typeCheckingMode": "strict", // Pylanceの型チェックを最も厳格な「strict」に設定
-  "python.analysis.autoImportCompletions": true,
 
-  // ==========================================
-  // 4. INFRA / OTHER CONFIG
-  // ==========================================
-  "[sql]": {
-    "editor.formatOnSave": false // DDLは手動のインデントや配置にこだわることが多いため意図的にOFF
-  },
-  "[yaml]": {
-    "editor.tabSize": 2,
-    "editor.insertSpaces": true
-  },
+  "ty.diagnosticMode": "workspace",
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/bin/python",
+  "python.venvPath": "${workspaceFolder}/backend",
+  "ty.interpreter": [
+    "${workspaceFolder}/backend/.venv/bin/python"
+  ],
+
   "files.watcherExclude": {
     "**/node_modules/**": true,
     "**/.next/**": true,
