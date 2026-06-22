@@ -1,4 +1,4 @@
-# 個人用メモ・日記アプリ
+# 個人用メモ・日記アプリ (note-gae-jp)
 
 日常の気付きや技術的な学びを記録するための個人用メモ・日記Webアプリケーションです。
 実務のベストプラクティス（徹底した型安全、第3正規形DB、環境別コンテナ運用、自動テスト、オブザーバビリティ）と、海外の最新SaaSに見られる極限まで洗練されたUI/UXデザインを融合させた、エンタープライズ品質のプロダクトとして設計されています。
@@ -169,6 +169,9 @@ VS Codeと同じエンジンである **Monaco Editor** を統合し、リアル
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_bigm"; -- 日本語全文検索用(2-gram)
 
+-- ステータス管理用のネイティブENUM型定義（型安全の徹底）
+CREATE TYPE entry_status AS ENUM ('draft', 'published', 'archived');
+
 -- ==============================================================================
 -- 2. UTILITIES
 -- ==============================================================================
@@ -207,14 +210,13 @@ CREATE TABLE entries (
     account_id UUID NOT NULL,
     title      TEXT NOT NULL,
     content    TEXT NOT NULL,
-    status     TEXT NOT NULL DEFAULT 'draft',
+    status     entry_status NOT NULL DEFAULT 'draft',
     is_pinned  BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ,
 
-    CONSTRAINT fk_entries_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
-    CONSTRAINT chk_status_enum CHECK (status IN ('published', 'draft', 'archived'))
+    CONSTRAINT fk_entries_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
 -- pg_bigm を使用した日本語全文検索インデックス
 CREATE INDEX idx_entries_content_search_gin ON entries USING gin (content gin_bigm_ops);
@@ -244,6 +246,7 @@ CREATE TABLE entry_tags (
     CONSTRAINT fk_et_entry FOREIGN KEY (entry_id) REFERENCES entries(id) ON DELETE CASCADE,
     CONSTRAINT fk_et_tag   FOREIGN KEY (tag_id)   REFERENCES tags(id)   ON DELETE CASCADE
 );
+CREATE INDEX idx_entry_tags_tag_id ON entry_tags(tag_id);
 
 -- AUDIT_LOGS: 管理操作ログ
 CREATE TABLE audit_logs (
@@ -262,23 +265,26 @@ CREATE INDEX idx_audit_logs_target ON audit_logs(target_account_id);
 -- ==============================================================================
 -- 4. ROW LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
+ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
 ALTER TABLE entry_tags ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY entries_user_policy ON entries
-    FOR ALL
-    USING (account_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid);
+CREATE POLICY account_isolation_policy ON accounts
+    USING (id = NULLIF(current_setting('app.current_account_id', true), '')::UUID OR is_admin = true);
 
-CREATE POLICY tags_user_policy ON tags
-    FOR ALL
-    USING (account_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid);
+CREATE POLICY entry_isolation_policy ON entries
+    USING (account_id = NULLIF(current_setting('app.current_account_id', true), '')::UUID);
 
-CREATE POLICY entry_tags_user_policy ON entry_tags
-    FOR ALL
+CREATE POLICY tag_isolation_policy ON tags
+    USING (account_id = NULLIF(current_setting('app.current_account_id', true), '')::UUID);
+
+CREATE POLICY entry_tags_isolation_policy ON entry_tags
     USING (
-        entry_id IN (
-            SELECT id FROM entries WHERE account_id = NULLIF(current_setting('app.current_user_id', true), '')::uuid
+        EXISTS (
+            SELECT 1 FROM entries 
+            WHERE entries.id = entry_tags.entry_id 
+              AND entries.account_id = NULLIF(current_setting('app.current_account_id', true), '')::UUID
         )
     );
 ```
@@ -310,7 +316,7 @@ erDiagram
         uuid account_id FK
         text title
         text content
-        text status
+        entry_status status
         boolean is_pinned
         timestamptz created_at
         timestamptz updated_at
@@ -376,7 +382,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
-
 ```
 
 ### 8-2. バックエンド (`backend/Dockerfile`)
@@ -401,7 +406,6 @@ USER appuser
 COPY . .
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
 ```
 
 ### 8-3. Docker Compose (`docker-compose.yml`)
