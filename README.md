@@ -44,7 +44,7 @@
 フロントエンドとバックエンドを完全に分離したモノレポ構成を採用しています。
 
 ```text
-my-diary-app/
+note-gae-jp/
 ├── backend/                  # FastAPI (Python 3.14)
 │   ├── app/                  
 │   │   ├── api/              # エンドポイント
